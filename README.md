@@ -1,9 +1,11 @@
 This is a readme about my simulator
 
-Literature Review
+## Literature Review
 
-Monton's paper
+# Monton's paper
+
 There is an local copy with the file name CARRV2020_paper_7_Monton.pdf
+
 His repository link(where I found his paper): https://github.com/mariusmm/RISC-V-TLM
 
 The paper is about RISC-V simulator using SystemC-TLM-2. 
@@ -14,4 +16,36 @@ SystemC is a set of libraries for the C++ language to help the simulation of har
 The author's simulator architecture includes an Instruction Set Simulator(ISS) for RV32I ISA, a bus controller, the main memory and peripherals. Communication is done by TLM-2 sockets.
 ![Hierarchy.png](https://github.com/mariusmm/RISC-V-TLM/raw/master/doc/Hierarchy.png)
 
+The CPU includes Instruction Decodes, Execute, Registers. It has some interfaces, Data bus, Instruction bus, IRQ line.
 
+The Bus Controller, includes different TLM socket.
+
+The Memory module simulates a simple RAM memory. It can read a binary file in Intel HEX format obtained from the .elf file.
+
+There is a timer to keep track of simulation time.
+
+Trace module is used as an output console for the simulated CPU.
+
+Performance module takes statistics of the simulation, such as instructions executed, registers accessed, memory accesed.
+
+Log module log each instruction executed. Record instuction's name, address, time and register values or addresses accessed, PC value, current time.
+
+The simulated CPU was able to run FreeRTOS. 
+
+Test compliance, risc-test and riscv-compliance suites.
+
+dhrystone benchmark test is also passed with correct results.
+
+The project code has been statically checked iwht coverity by Synopsis.
+
+Performance of Simulator is about 8 million of simulated instructions per second.
+
+# Commentary:
+
+I imaging getting all the instruction implemented is a lot of work. The instruction set manual for Intel processor is thousands pages long. I'm expecting the RISC-V ISA to be just as complex. It's pretty impressive that the author did all that.
+
+Passed a lot of tests, riscv-compliance suites and dhrystone benchmark, just to name a few. Also able to run complex program like FreeRTOS. Sounds great.
+
+The author used mostly C and some C++ template. I'm assuming he used Linux.
+
+Performance is 8 million of instructions per second. Not sure how that speed compares to the processor execute in real time. The real processor may takes tens of cycle to execute one complex instructions, such as floating point multiply. But majority of the instruction should be executed in one cycle. A normal CPU should operate aroud 2 GHz or more. So the processor in real time should execute 1-2 billion instructions per second. The simulator is orders of magnitudes slower, about 100 times slower. A real CPU execute 1 minute means simulator running 1 hour and 40 minutes. Now, I see why big semiconductor companies need FPGA to speed up the testing.
