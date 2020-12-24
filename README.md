@@ -12,6 +12,6 @@ Different simulators have different focus, on performance, speed, or good visuli
 SystemC is a set of libraries for the C++ language to help the simulation of hardware based system by an event-driven model.
 
 The author's simulator architecture includes an Instruction Set Simulator(ISS) for RV32I ISA, a bus controller, the main memory and peripherals. Communication is done by TLM-2 sockets.
-![Hierarchy.png](https://github.com/mariusmm/RISC-V-TLM/raw/master/doc/)
+![Hierarchy.png](https://github.com/mariusmm/RISC-V-TLM/raw/master/doc/Hierarchy.png)
 
 
