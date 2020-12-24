@@ -24,7 +24,11 @@ Use cases of microprocessor.
 
 RISC-V is shiny new and fast, but what's it for? If it's not for anything, then why build a simulator for it?
 
-Drone and avionics.
+Drone and avionics. Here is a flight computer software repository: https://github.com/UMSATS/Avionics-Flight-Computer
+
+Use FreeRTOS for the Drone firmware? https://en.wikipedia.org/wiki/FreeRTOS
+
+Some videp tutorial for SystemC: http://videos.accellera.org/tlm20sdvvirtual/
 
 It really want clock cycle level of accuracy. Fast to run. Able to see where the code is in the silicon. Preferablly at the gate level or below. Be able to see where the data moves between clock cycle to clock cycle.
 Multiple component on the flight control board, multiple IC potentially.
@@ -91,3 +95,5 @@ The author used mostly C and some C++ template. I'm assuming he used Linux.
 Performance is 8 million of instructions per second. Not sure how that speed compares to the processor execute in real time. The real processor may takes tens of cycle to execute one complex instructions, such as floating point multiply. But majority of the instruction should be executed in one cycle. A normal CPU should operate aroud 2 GHz or more. So the processor in real time should execute 1-2 billion instructions per second. The simulator is orders of magnitudes slower, about 100 times slower. A real CPU execute 1 minute means simulator running 1 hour and 40 minutes. Now, I see why big semiconductor companies need FPGA to speed up the testing.
 
 The author didn't seem to use parallization on host CPU to speed up the simulation.
+
+After searching around in the code base, the author didn't seem to take the simulation cycle time into account. All instructions seems to take the same amount of time.
