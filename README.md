@@ -40,6 +40,58 @@ Sensor has its model and microprocessor has its model.
 
 Need a detailed survey of different simulator architecture. 
 
+Get a simulator that can simulate all RISC-V instructions.
+Create an architecture for RISC-V. To get beyond ISA simulation and getting clock cycle accuracy, we need to know the architecture.
+
+Be able to run compiled code from compiler.
+
+Is it just a piece of verilog code?
+
+Yes, we can use Vivado HLS to convert C code to Verilog. But the tool chain doesn't seem to be mature.
+
+Verilog is the best suited to model hardware, since it is a hardware description language. Why do we need C or SystemC to describe hardware? SystemC is really just for speeding up the software development process by modeling the SoC. SystemC model suppose to be identical to the hardware. So the proper order is to develop Verilog first, creating the architecture first. Then translate it into SystemC for software driver development.
+
+
+## Verilog-A
+
+I found it here: https://en.wikipedia.org/wiki/Verilog-A
+
+This is used to model analog IC. People use it to create mixed signal IC, like ADC and amplifier.
+
+
+
+## SystemC to Verilog Converter
+
+I found it here: http://sysc2ver.sourceforge.net/
+
+
+
+## SimulAVR
+
+I found it here: https://www.nongnu.org/simulavr/features.html
+
+### Summary
+
+Clock cycle accurate AVR microprocessor simulator. It can simulate ATMEGA328P, the Arduino. It can load ELF file and simulate multiple processors in the same environment and see how they interact.
+
+
+### Commentary
+
+From other online forum, it seems this is an abandoned project. Took someone a week to get the example simulation working. This simulator has clock cycle level accuracy, which is nice. It may take too long for me to grasp the whole code base and make modifications.
+
+
+## Nvidia Next Gen Falcon Controller
+
+I found it here: https://www.phoronix.com/scan.php?page=news_item&px=NVIDIA-RISC-V-Next-Gen-Falcon
+
+### Summary
+
+Nvidia is using RISC-V as a base and designed a new ISA for their control CPU on their GPU chip. They showed detailed architecture diagram and talked about their cache structure. The talk also mentioned spike simulator for RISC-V and SystemC in the Q&A at the end.
+
+### Commentary
+
+Spike is just an ISA simulator. Its usefulness is limited for IC design. 
+
 
 ## Monton's paper
 
