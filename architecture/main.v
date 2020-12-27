@@ -26,14 +26,14 @@ input [31:0] inst;
 input [31:0] in_bus;
 output [31:0] out_bus;
 
-wire [31:0] rd_data1, rd_data2, wr_data;
-wire [5:0] dp_ctrl;
-wire [3:0] addr1, addr2;
+wire [31:0] rd_data1, rd_data2, wr_data, immediate;
+wire [6:0] dp_ctrl;
+wire [4:0] addr1, addr2;
 wire rd1, rd2, wr1, wr2;
 
 // Instantiation of the modules
-Control control_module(.clk(clk), .addr1(addr1), .addr2(addr2), .rd1(rd1), .rd2(rd2), .wr1(wr1), .wr2(wr2), .dp_ctrl(dp_ctrl), .inst(inst));
-Datapath datapath_module(.clk(clk), .dp_ctrl(dp_ctrl), .wr_data(wr_data), .rd_data1(rd_data1), .rd_data2(rd_data2), .in_bus(in_bus), .out_bus(out_bus));
+Control control_module(.clk(clk), .addr1(addr1), .addr2(addr2), .rd1(rd1), .rd2(rd2), .wr1(wr1), .wr2(wr2), .dp_ctrl(dp_ctrl), .immediate(immediate), .inst(inst));
+Datapath datapath_module(.clk(clk), .dp_ctrl(dp_ctrl), .wr_data(wr_data), .rd_data1(rd_data1), .rd_data2(rd_data2), .immediate(immediate), .in_bus(in_bus), .out_bus(out_bus));
 RegisterFile register_module(.clk(clk), .addr1(addr1), .addr2(addr2), .rd1(rd1), .rd2(rd2), .wr1(wr1), .wr2(wr2), .wr_data(wr_data), .rd_data1(rd_data1), .rd_data2(rd_data2));
 
 endmodule
@@ -282,14 +282,14 @@ begin
 
 	s2 :	// Cycle 3 -- perform datapath operation
 		begin
-			dp_ctrl <= dp_ctrl; // -------------------------------------- pick up here
+			dp_ctrl <= dp_ctrl;
 			rd1 <= 0;
 			rd2 <= 0;
 			addr1 <= saved_inst[11:8];
 			addr2 <= saved_inst[11:8];
 			wr1 <= 0;
 			wr2 <= 0;
-			case (saved_inst[15:12])
+			case (saved_inst[6:0])
 				7'b0000000: // NOP
 				begin
 					wr1 <= 0;
@@ -325,6 +325,17 @@ begin
                 begin
 				    wr1 <= 0;
 					wr2 <= 0;		
+                end
+                
+                
+                // -------------------------------------- RISC-V --------------------------------------
+                
+                7'b0110111: // LUI (Load Upper Immediate) Spec. PDF-Page 37 
+                begin
+				    wr1 <= 1;
+					wr2 <= 1;	
+					addr1 <= saved_inst[11:7];
+			        addr2 <= saved_inst[11:7];
                 end
 			endcase
 			next_state = s3;

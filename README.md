@@ -1,5 +1,37 @@
 This is a readme about my simulator
 
+# Tasks
+
+
+## Create TCL script for automating simulation run and output checking
+TCL command documentation local copy with the name: ug835-vivado-tcl-commands.pdf
+
+List of commands at PDF Page 20.
+
+After opening the TCL shell, use 'source' command to run script.
+
+### Tcl Command Category - Project\
+open_project - Open a Vivado project file (.xpr)\
+close_project - Close current opened project \
+
+
+### TCL Command Category - Simulation\
+
+launch_simulation - need to open project first
+close_sim - Unload the current simulation without existing Vivado\
+
+get_value - get current value of the selected HDL object(variable, signal, wire, reg)
+
+restart - Rewind simulation to post loading state, time is set to 0.\
+run - Run the simulation for the specified time.\
+
+
+## Create Python script for generating verilog testbench and Tcl scripts
+
+Generate Tcl scripts to check register file content and out_bus content.\
+Generate Verilog testbench.\
+
+
 # Literature Review
 
 ## Personal Opinion
