@@ -51,6 +51,94 @@ Yes, we can use Vivado HLS to convert C code to Verilog. But the tool chain does
 
 Verilog is the best suited to model hardware, since it is a hardware description language. Why do we need C or SystemC to describe hardware? SystemC is really just for speeding up the software development process by modeling the SoC. SystemC model suppose to be identical to the hardware. So the proper order is to develop Verilog first, creating the architecture first. Then translate it into SystemC for software driver development.
 
+The usefulness of SystemC model really comes from be exact match with the hardware. This allows the programmer to probe every part of the hardware, it's good for debugging, performance tuning, and power tuning. As measuring timing using the real hardware is hard. We will need real hardware timing module to profiling different part of the hardware, this by itself will introduce error. However, there is one advantage of using hardware, it will be fast. But SystemC can be optimized to run fast, and it's software, we can change it anytime.
+
+
+I will use Verilog to create an architecture that confront the RISC-V ISA. Then use SystemC to create a software model for it.
+
+There are RISC-V verilog implementation exist.
+
+## DSP Architecture
+
+I found a lecture slide here: http://bwrcs.eecs.berkeley.edu/Classes/CS252/Notes/Lec09-DSP.pdf
+
+I'm sure there are more information online about DSP architecture. DSPs are specialized for audio signal processing. Not really reprogrammable, designed to do one thing. Software is not king. It's really specialized hardware. 
+
+
+## FreeRTOS
+
+Website here: https://www.freertos.org/tutorial/solution2.html
+
+It an operating system for embeded system. The interesting part is the context switching. The OS will get all the register content, PC, Stack Pointers, Status Register into stack. This is how it does context switching. Therefore, the software can pretend nothing happened and let the OS to handle the scheduling.
+
+
+
+## LLVM Compiler
+
+I found it here: https://www.llvm.org/docs/ExtendingLLVM.html
+
+It's advised to not changing the LLVM C compiler because it's difficult. I'm sure there are existing RISC-V compiler. Don't want to increase difficulty.
+
+## Flight Controller
+
+The repository is here: https://github.com/UMSATS/Avionics-Flight-Computer/tree/v2.0.0/AvionicsSoftware-AtollicProject/Src
+
+Potential user of the SoC. It needs Altimeter, Gyroscope, Accelerometer, Pressure Sensor, Buttons, Buzzer, Presistent Data Storage. Interface used: SPI, UART.
+
+
+## DRAM Interface
+
+I found it here: https://www.brainkart.com/article/DRAM-interfaces_7638/#:~:text=DRAM%20interfaces%20.%20The%20basic%20DRAM%20interface%20.,partial%20address%20is%20latched%20internally%20by%20the%20DRAM.
+
+I am not necessarily creating a DRAM, but its verilog model is useful for the SoC system testing. 
+
+## OpenROAD
+
+The wiki: https://openroad.readthedocs.io/en/latest/user/getting-started.html
+
+It's using CentOS 7. It's for Digital IC layout, the only known alternative for Paid Digital IC layout tool such as Cadense Virtuoso. 
+
+
+## SkyWater Open Source PDK
+
+Repository here: https://github.com/google/skywater-pdk
+
+Google let us tape out 130 nm technology chip for free. Their Process Development Kit is on Github.
+
+
+## RISC-V Spec
+
+I found it here: https://riscv.org/technical/specifications/
+
+There is a local copy with the file name: riscv-spec-20191213.pdf
+
+
+## Spike Simulator for RISC-V ISA
+
+The repository is here: https://github.com/riscv/riscv-isa-sim/tree/master/riscv/insns
+
+
+## MIPS Architecture
+
+I found it here: http://dictionary.sensagent.com/MIPS%20architecture/en-en/#:~:text=MIPS%20%28originally%20an%20acronym%20for%20Microprocessor%20without%20Interlocked,architectures%20were%2032-bit%2C%20and%20later%20versions%20were%2064-bit.
+
+MIPS is an old technology, it's out of fashion. But it's RISC.
+
+
+## ATMEGA328P Datasheet
+
+I found it here: https://ww1.microchip.com/downloads/en/DeviceDoc/Atmel-7810-Automotive-Microcontrollers-ATmega328P_Datasheet.pdf
+
+This really shows the problem. It's a datasheet of the microprocessor. It's long, hard to understand, hard to search around, hard for software development. If there was a SystemC model, we can see what the chip is doing in the simulator. We don't need the chip for software development. And we don't really want the chip, as it is just a black box, give it some input and it may give correct output. Not really helpful for debugging.
+
+## Verilog VS SystemC
+
+This article talked about differences between Verilog and SystemC: https://www.design-reuse.com/articles/34931/systemverilog-versus-systemc.html
+
+SystemC is used for speeding up the software development process. SystemC suppose to match exactly to the hardware SoC, so software team can use it to develop software.
+
+SystemVerilog is used for hardware implementation verification.
+
 
 ## Verilog-A
 
@@ -58,6 +146,11 @@ I found it here: https://en.wikipedia.org/wiki/Verilog-A
 
 This is used to model analog IC. People use it to create mixed signal IC, like ADC and amplifier.
 
+## Verilog-A ADC
+
+I found it here: https://www.doulos.com/knowhow/verilog/analog-to-digital-converter/
+
+It's an analog to digital converter written in Verilog-A.
 
 
 ## SystemC to Verilog Converter
