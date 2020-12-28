@@ -20,20 +20,23 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 
-module main(clk, inst, in_bus, out_bus);
+module main(clk, rst, inst, in_bus, out_bus);
 input clk;
+input rst;
 input [31:0] inst;
 input [31:0] in_bus;
 output [31:0] out_bus;
 
-wire [31:0] rd_data1, rd_data2, wr_data, immediate;
+wire [31:0] rd_data1, rd_data2, wr_data, wr_pc, PC;
+wire [19:0] immediate;
+
 wire [6:0] dp_ctrl;
 wire [4:0] addr1, addr2;
 wire rd1, rd2, wr1, wr2;
 
 // Instantiation of the modules
-Control control_module(.clk(clk), .addr1(addr1), .addr2(addr2), .rd1(rd1), .rd2(rd2), .wr1(wr1), .wr2(wr2), .dp_ctrl(dp_ctrl), .immediate(immediate), .inst(inst));
-Datapath datapath_module(.clk(clk), .dp_ctrl(dp_ctrl), .wr_data(wr_data), .rd_data1(rd_data1), .rd_data2(rd_data2), .immediate(immediate), .in_bus(in_bus), .out_bus(out_bus));
+Control control_module(.clk(clk), .rst(rst), .addr1(addr1), .addr2(addr2), .rd1(rd1), .rd2(rd2), .wr1(wr1), .wr2(wr2), .dp_ctrl(dp_ctrl), .immediate(immediate), .inst(inst), .PC(PC), .wr_pc(wr_pc));
+Datapath datapath_module(.clk(clk), .dp_ctrl(dp_ctrl), .wr_data(wr_data), .wr_pc(wr_pc), .PC(PC), .rd_data1(rd_data1), .rd_data2(rd_data2), .immediate(immediate), .in_bus(in_bus), .out_bus(out_bus));
 RegisterFile register_module(.clk(clk), .addr1(addr1), .addr2(addr2), .rd1(rd1), .rd2(rd2), .wr1(wr1), .wr2(wr2), .wr_data(wr_data), .rd_data1(rd_data1), .rd_data2(rd_data2));
 
 endmodule
@@ -69,10 +72,12 @@ end
 
 endmodule
 
-module Datapath (clk, dp_ctrl, wr_data, rd_data1, rd_data2, immediate, in_bus, out_bus);
+module Datapath (clk, dp_ctrl, wr_data, wr_pc, PC, rd_data1, rd_data2, immediate, in_bus, out_bus);
 input clk;
 input [6:0] dp_ctrl;
 output reg [31:0] wr_data;
+output reg [31:0] wr_pc;
+input [31:0] PC;
 input [31:0] rd_data1;
 input [31:0] rd_data2;
 input [19:0] immediate;
@@ -111,12 +116,16 @@ begin
 	    
 	else if (dp_ctrl == 7'b0110111) // LUI (Load Upper Immediate) Spec. PDF-Page 37 )
 	    wr_data <= {immediate, 12'b0};
+	else if (dp_ctrl == 7'b0010111) // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
+	    wr_data <= {immediate, 12'b0} + PC;
+	    wr_pc <= {immediate, 12'b0} + PC;
 end
 
 endmodule
 
-module Control (clk, addr1, addr2, rd1, rd2, wr1, wr2, dp_ctrl, immediate, inst);
+module Control (clk, rst, addr1, addr2, rd1, rd2, wr1, wr2, dp_ctrl, immediate, inst, PC, wr_pc);
 input clk;
+input rst;
 input [31:0] inst;
 output reg [4:0] addr1;		
 output reg [4:0] addr2;
@@ -126,6 +135,8 @@ output reg wr1;
 output reg wr2;
 output reg [6:0] dp_ctrl;
 output reg [19:0] immediate;
+output reg [31:0] PC;
+input [31:0] wr_pc;
 
 reg [1:0] cycle;
 reg [31:0] saved_inst;
@@ -134,222 +145,261 @@ parameter [1:0]s0=2'b00,s1=2'b01,s2=2'b11,s3=2'b10; // Use Gray coding for state
 
 // FSM Control Logic
 // Keeps track of which phase we are in (decode, load, datapath, writeback)
-always @ (posedge clk)
-begin
-	if(inst[6:0] == 7'b0000000)
-		state = s0;
-	else
-		state = next_state;
-end
+//always @ (posedge clk)
+//begin
+//    if(rst) begin
+//        PC <= 32'b0;
+//        state <= s0;
+//    end
+//    else begin
+//        state <= next_state;
+//    end
+//end
 
 // FSM
 always @ (posedge clk)
 begin
-	case (state)
-
-	s0:	// Cycle 1 -- Decode
-		begin
-			dp_ctrl <= 0;
-			wr1 <= 0;
-			wr2 <= 0;
-			addr1 <= inst[7:4];
-			addr2 <= inst[3:0];
-			rd1 <= 0;
-			rd2 <= 0;
-			saved_inst <= inst; // Instruction input may not be valid in future clock cycles. So, we save the instruction in an internal register.
-			next_state = s0;
-			case (inst[6:0])
-				// Set the control signals for the next phase
-				7'b0000000: // NOP
-					begin
-						rd1 <= 0;
-						rd2 <= 0;
-						next_state = s0;
-					end
-				7'b0000001: // ANDLSB
-					begin
-						rd1 <= 1;
-						rd2 <= 1;
-						next_state = s1;
-					end
-				7'b0000010: // Add
-					begin
-						rd1 <= 1;
-						rd2 <= 1;
-						next_state = s1;
-					end
-				7'b0000100: // Right shift
-					begin
-						rd1 <= 1;
-						rd2 <= 0;
-						next_state = s1;
-					end
-				7'b0000101: // Left shift
-					begin
-						rd1 <= 1;
-						rd2 <= 0;
-						next_state = s1;
-					end
-				7'b0001000: // Load
-					begin
-						rd1 <= 0;
-						rd2 <= 0;
-						addr1 <= inst[11:8];
-						next_state = s1;
-					end
-				7'b0001001: // Store
-					begin
-						rd1 <= 1;
-						rd2 <= 0;
-						next_state = s1;
-					end
-				
-				// -------------------------------------- RISC-V --------------------------------------
-				
-				7'b0110111: // LUI (Load Upper Immediate) Spec. PDF-Page 37 
-					begin
-						rd1 <= 0;
-						rd2 <= 0;
-						next_state = s1;
-					end
-			endcase
-		end
-
-	s1 :	// Cycle 2 -- fetch operands from register file
-		begin
-			// TODO:: Add control logic
-//			dp_ctrl <= 0;
-//			wr1 <= 0;
-//			wr2 <= 0;
-//			addr1 <= inst[7:4];
-//			addr2 <= inst[3:0];
-//			rd1 <= 0;
-//			rd2 <= 0;
-//			saved_inst <= inst; // Instruction input may not be valid in future clock cycles. So, we save the instruction in an internal register.
-//			next_state = s0;
-            dp_ctrl  <= saved_inst[6:0];
-			case (saved_inst[6:0])
-				// Set the control signals for the next phase
-				// NOP should have never reached this state. It should kept at s0
-//				4'b0000: // NOP
-//					begin
-//						rd1 <= 0;
-//						rd2 <= 0;
-//						next_state = s0;
-//					end
-				7'b0000001: // ANDLSB
-					begin
-						dp_ctrl <= 6'b001000;
-//						next_state = s2;
-					end
-				7'b0000010: // Add
-					begin
-						dp_ctrl <= 6'b000001;
-//						next_state = s2;
-					end
-				7'b0000100: // Right shift
-					begin
-						dp_ctrl <= 6'b000010;
-//						next_state = s2;
-					end
-				7'b0000101: // Left shift
-					begin
-						dp_ctrl <= 6'b000100;
-//						next_state = s2;
-					end
-				7'b0001000: // Load
-					begin
-						dp_ctrl <= 6'b010000;
-//						addr1 <= inst[11:8];
-//						next_state = s2;
-					end
-				7'b0001001: // Store
-					begin
-						dp_ctrl <= 6'b100000;
-//						next_state = s2;
-					end
-				
-				// -------------------------------------- RISC-V --------------------------------------
-				
-				7'b0110111: // LUI (Load Upper Immediate) Spec. PDF-Page 37 
-					begin
-						immediate <= saved_inst[31:12];
-					end
-				
-			endcase
-			next_state = s2;
-		end
-
-	s2 :	// Cycle 3 -- perform datapath operation
-		begin
-			dp_ctrl <= dp_ctrl;
-			rd1 <= 0;
-			rd2 <= 0;
-			addr1 <= saved_inst[11:8];
-			addr2 <= saved_inst[11:8];
-			wr1 <= 0;
-			wr2 <= 0;
-			case (saved_inst[6:0])
-				7'b0000000: // NOP
-				begin
-					wr1 <= 0;
-					wr2 <= 0;
-				end
-				7'b0000001: // ANDLSB
-				begin
-					wr1 <= 1;
-					wr2 <= 1;
-				end
-				// TODO: Add cases for remaining instructions
-				7'b0000010: // Add
-                begin
-					wr1 <= 1;
-					wr2 <= 1;
-                end
-				7'b0000100: // Right shift
-                begin
-					wr1 <= 1;
-					wr2 <= 1;
-                end
-				7'b0000101: // Left shift
-                begin
-					wr1 <= 1;
-					wr2 <= 1;
-                end
-				7'b0001000: // Load
-                begin
-					wr1 <= 1;
-					wr2 <= 1;
-                end
-				7'b0001001: // Store
-                begin
-				    wr1 <= 0;
-					wr2 <= 0;		
-                end
+    if(rst) begin
+        PC <= 32'b0;
+        state <= s0;
+    end
+    else begin
+       
+        case (state)
+    
+        s0:	// Cycle 1 -- Decode
+            begin
+                dp_ctrl <= 0;
+                wr1 <= 0;
+                wr2 <= 0;
+                addr1 <= inst[7:4];
+                addr2 <= inst[3:0];
+                rd1 <= 0;
+                rd2 <= 0;
+                saved_inst <= inst; // Instruction input may not be valid in future clock cycles. So, we save the instruction in an internal register.
+//                next_state = s0;
+                state <= s1;
+                case (inst[6:0])
+                    // Set the control signals for the next phase
+                    7'b0000000: // NOP
+                        begin
+                            rd1 <= 0;
+                            rd2 <= 0;
+//                            next_state = s1;
+                        end
+                    7'b0000001: // ANDLSB
+                        begin
+                            rd1 <= 1;
+                            rd2 <= 1;
+//                            next_state = s1;
+                        end
+                    7'b0000010: // Add
+                        begin
+                            rd1 <= 1;
+                            rd2 <= 1;
+//                            next_state = s1;
+                        end
+                    7'b0000100: // Right shift
+                        begin
+                            rd1 <= 1;
+                            rd2 <= 0;
+//                            next_state = s1;
+                        end
+                    7'b0000101: // Left shift
+                        begin
+                            rd1 <= 1;
+                            rd2 <= 0;
+//                            next_state = s1;
+                        end
+                    7'b0001000: // Load
+                        begin
+                            rd1 <= 0;
+                            rd2 <= 0;
+                            addr1 <= inst[11:8];
+//                            next_state = s1;
+                        end
+                    7'b0001001: // Store
+                        begin
+                            rd1 <= 1;
+                            rd2 <= 0;
+//                            next_state = s1;
+                        end
+                    
+                    // -------------------------------------- RISC-V --------------------------------------
+                    
+                    7'b0110111: // LUI (Load Upper Immediate) Spec. PDF-Page 37 
+                        begin
+                            rd1 <= 0;
+                            rd2 <= 0;
+//                            next_state = s1;
+                        end
+                    7'b0010111: // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
+                        begin
+                            rd1 <= 0;
+                            rd2 <= 0;
+                        end
+                        
+                endcase
+            end
+    
+        s1 :	// Cycle 2 -- fetch operands from register file
+            begin
+                // TODO:: Add control logic
+    //			dp_ctrl <= 0;
+    //			wr1 <= 0;
+    //			wr2 <= 0;
+    //			addr1 <= inst[7:4];
+    //			addr2 <= inst[3:0];
+    //			rd1 <= 0;
+    //			rd2 <= 0;
+    //			saved_inst <= inst; // Instruction input may not be valid in future clock cycles. So, we save the instruction in an internal register.
+    //			next_state = s0;
+                dp_ctrl  <= saved_inst[6:0];
+                state <= s2;
+                case (saved_inst[6:0])
+                    // Set the control signals for the next phase
+                    7'b0000000: // NOP
+                        begin
+                            dp_ctrl <= 6'b000000;
+                        end
+                    7'b0000001: // ANDLSB
+                        begin
+                            dp_ctrl <= 6'b001000;
+    //						next_state = s2;
+                        end
+                    7'b0000010: // Add
+                        begin
+                            dp_ctrl <= 6'b000001;
+    //						next_state = s2;
+                        end
+                    7'b0000100: // Right shift
+                        begin
+                            dp_ctrl <= 6'b000010;
+    //						next_state = s2;
+                        end
+                    7'b0000101: // Left shift
+                        begin
+                            dp_ctrl <= 6'b000100;
+    //						next_state = s2;
+                        end
+                    7'b0001000: // Load
+                        begin
+                            dp_ctrl <= 6'b010000;
+    //						addr1 <= inst[11:8];
+    //						next_state = s2;
+                        end
+                    7'b0001001: // Store
+                        begin
+                            dp_ctrl <= 6'b100000;
+    //						next_state = s2;
+                        end
+                    
+                    // -------------------------------------- RISC-V --------------------------------------
+                    
+                    7'b0110111: // LUI (Load Upper Immediate) Spec. PDF-Page 37 
+                        begin
+                            immediate <= saved_inst[31:12];
+                        end
+                    7'b0010111: // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
+                        begin
+                            immediate <= saved_inst[31:12];
+                        end
+                    
+                endcase
                 
+            end
+    
+        s2 :	// Cycle 3 -- perform datapath operation
+            begin
+                dp_ctrl <= dp_ctrl;
+                rd1 <= 0;
+                rd2 <= 0;
+                addr1 <= saved_inst[11:8];
+                addr2 <= saved_inst[11:8];
+                wr1 <= 0;
+                wr2 <= 0;
+                state <= s3;
+                case (saved_inst[6:0])
+                    7'b0000000: // NOP
+                    begin
+                        wr1 <= 0;
+                        wr2 <= 0;
+                    end
+                    7'b0000001: // ANDLSB
+                    begin
+                        wr1 <= 1;
+                        wr2 <= 1;
+                    end
+                    // TODO: Add cases for remaining instructions
+                    7'b0000010: // Add
+                    begin
+                        wr1 <= 1;
+                        wr2 <= 1;
+                    end
+                    7'b0000100: // Right shift
+                    begin
+                        wr1 <= 1;
+                        wr2 <= 1;
+                    end
+                    7'b0000101: // Left shift
+                    begin
+                        wr1 <= 1;
+                        wr2 <= 1;
+                    end
+                    7'b0001000: // Load
+                    begin
+                        wr1 <= 1;
+                        wr2 <= 1;
+                    end
+                    7'b0001001: // Store
+                    begin
+                        wr1 <= 0;
+                        wr2 <= 0;		
+                    end
+                    
+                    
+                    // -------------------------------------- RISC-V --------------------------------------
+                    
+                    7'b0110111: // LUI (Load Upper Immediate) Spec. PDF-Page 37 
+                    begin
+                        wr1 <= 1;
+                        wr2 <= 1;	
+                        addr1 <= saved_inst[11:7];
+                        addr2 <= saved_inst[11:7];
+                    end
+                    7'b0010111: // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
+                    begin
+                        wr1 <= 1;
+                        wr2 <= 1;	
+                        addr1 <= saved_inst[11:7];
+                        addr2 <= saved_inst[11:7];
+                    end
+                endcase
                 
-                // -------------------------------------- RISC-V --------------------------------------
-                
-                7'b0110111: // LUI (Load Upper Immediate) Spec. PDF-Page 37 
-                begin
-				    wr1 <= 1;
-					wr2 <= 1;	
-					addr1 <= saved_inst[11:7];
-			        addr2 <= saved_inst[11:7];
-                end
-			endcase
-			next_state = s3;
-		end
-
-	s3 :	// Cycle 4 -- write back
-		begin
-			rd1 <= 0;
-			rd2 <= 0;
-			wr1 <= 0;
-			wr2 <= 0;
-			next_state = s0;
-		end
-	endcase
+            end
+    
+        s3 :	// Cycle 4 -- write back
+            begin
+                rd1 <= 0;
+                rd2 <= 0;
+                wr1 <= 0;
+                wr2 <= 0;
+                state <= s0;
+                case (inst[6:0])
+                    // -------------------------------------- RISC-V --------------------------------------
+                    
+                    7'b0010111: // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
+                        begin
+                            PC <= wr_pc;
+                        end
+                    default:
+                        begin
+                            PC <= PC + 1'b1;
+                        end
+                endcase
+            end
+        endcase
+	end
 end
 
 endmodule
