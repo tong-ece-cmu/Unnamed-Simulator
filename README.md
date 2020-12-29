@@ -2,6 +2,11 @@ This is a readme about my simulator
 
 # Tasks
 
+## Create a SystemC model for our little architecture
+
+To run the SystemC example code on windows, need to set SYSTEMCHOME macro in visual studio. It was mentioned in one of the readme file and I found how to do it here: https://docs.microsoft.com/en-us/cpp/build/working-with-project-properties?view=msvc-160#:~:text=%20To%20create%20a%20user-defined%20macro%20%201,select%20the%20Set%20this%20macro%20as...%20More%20
+
+
 
 ## Create TCL script for automating simulation run and output checking
 TCL command documentation local copy with the name: ug835-vivado-tcl-commands.pdf
@@ -36,59 +41,57 @@ Generate Verilog testbench.\
 
 ## Personal Opinion
 
-What level of abstraction should I use?\
-Logic Gate Level? Block Diagram Level?
+So we are going to write a simulator for an integrated circuit. The question that comes to mind is what level of abstraction should we use? Should model at Logic Gate Level(NAND gate, OR gate, etc)? Block Diagram Level(CPU, DRAM, cache)?
 
-Should I use RISC-V as the target? That looks too complex.
+From Monton's paper and Nivida's video, RISC-V seems to be the new frontier for ISA. Should we use RISC-V as the target for the simulator? Is it going to be very hard and time consuming? I also don't know what the RISC-V architecture looks like. I have a rough idea on what MIPS architecture looks like.
 
-Can I build a RISC-V simulator without knowledge the RISC-V processor? - NO.\
-Is writing a simulator a hard task? - YES.\
-Is learning RISC-V architecture a hard task? - YES.\
-Is doing two hard task at the same time a good idea? - NO.
+    Can I build a RISC-V simulator without knowledge the RISC-V processor? - NO.\
+    Is writing a simulator a hard task? - YES.\
+    Is learning RISC-V architecture a hard task? - YES.\
+    Is doing two hard task at the same time a good idea? - NO.
 
-What is a simulator and what is it for?\
-It's an incomplete model of the real thing. We use it to predict the future with some accuracy. 
+So how about we just write a simulator for something to start. Then after we get some experience, we can come back and create simulator for RISC-V. But this creates a new question, what simulator should we write for? What's the target for us to model? Let's start from the beginning. 
 
-What do we want to know about the future of a piece of silicon?\
-We want to know the behavior of the whole system. And see if it matches with our expectation.
+    What is a simulator and what is it for?\
+    It's an incomplete model of the real world. We use it to predict the future with some level of accuracy. 
 
-Use cases of microprocessor.
+    What do we want to know about the future of a piece of silicon?\
+    We want to know the behavior of the whole system. And see if it matches with our expectation.
 
-RISC-V is shiny new and fast, but what's it for? If it's not for anything, then why build a simulator for it?
+Then what exactly is our expection? RISC-V is shiny new and good, but what's it for? If it's not for anything, then why build a simulator for it? Or why did they bother to create a new ISA like RISC-V? Why can't we just use the old ISA?
 
-Drone and avionics. Here is a flight computer software repository: https://github.com/UMSATS/Avionics-Flight-Computer
+Processor can be used for embedded system. One exciting example of embedded system is Drone and avionics. Here is a flight computer software repository: https://github.com/UMSATS/Avionics-Flight-Computer
 
-Use FreeRTOS for the Drone firmware? https://en.wikipedia.org/wiki/FreeRTOS
+They used FreeRTOS to help writing their firmware? https://en.wikipedia.org/wiki/FreeRTOS
 
-Some videp tutorial for SystemC: http://videos.accellera.org/tlm20sdvvirtual/
+Looking at their code, they are using firmware to handle communications between different sensors, typical embedded system code. They used SPI and UART interfaces. They also used FreeRTOS to schedule different tasks instead of putting everything in a big while loop. Using FreeRTOS involves context switching. What's context switching? It's saving the CPU register file content on to the stack and flush the pipeline.
 
-It really want clock cycle level of accuracy. Fast to run. Able to see where the code is in the silicon. Preferablly at the gate level or below. Be able to see where the data moves between clock cycle to clock cycle.
-Multiple component on the flight control board, multiple IC potentially.
-The role of the simulator is to act as a detailed spec or interface or contract between hardware and software.
+They had a picture of their flight controller PCB borad. And there are multiple component, IC, on the flight control board.
 
-Enable simultaneous development of software and hardware. If they both confront to the simulator, then there shouldn't be any debugging required during the final convergence of the whole system.
+From my experience, embedded system firmware development will be really benefit if they can have a simulator that can give clock cycle level of accuracy. Fast to run. Able to see where the code is in the silicon. Preferablly at the gate level or below. Be able to see where the data moves between clock cycle to clock cycle. There is very little, a software developer can do when trying to debug a hardware. He can upload code to the hardware. They can try to create some physical phenomenon to show their code is somewhat working(flash LED, etc). If there is a simulator of the embedded system, then the programmer can see through the silicon and really figure out what's going on in the chip. Idealy ,sensor should have its model and microprocessor should have its model. This way, we can model the whole PCB.
 
-Sensor has its model and microprocessor has its model.
+The role of the simulator is to act as a detailed spec, or interface, or contract between hardware and software. It enables simultaneous development of software and hardware. If they both adhere to the simulator, then there shouldn't be any debugging required during the final convergence of the whole system.
 
-Need a detailed survey of different simulator architecture. 
+After reading the RISC-V specification in more deatil, it doesn't looks esaier than I thought. The intel processor ISA is thousands pages long, while RISC-V is about one hundred, maybe 50 instructions or so. RISC-V simulator should be very doable. We need a detailed survey of different simulator architecture. We can just roll the C++ code and do whatever our heart desires, but at least seeing a little bit on what others have been doing can avoid some pitfalls.
 
-Get a simulator that can simulate all RISC-V instructions.
-Create an architecture for RISC-V. To get beyond ISA simulation and getting clock cycle accuracy, we need to know the architecture.
+Then this is settled. We will make a simulator that can simulate all RISC-V instructions. To get beyond ISA simulation and getting clock cycle accuracy, we need to know the architecture.
+We will also create an architecture for RISC-V using verilog. The simulator should be able to run compiled code from a RISC-V compiler, which I assume should exist somewhere on the web.
 
-Be able to run compiled code from compiler.
+If we have the architecture in verilog and simulated it, we know this architecture will work. Then why need a SystemC model? Is it just a copy of the verilog code? There are verilog to C converter software. And yes, we can also use Vivado HLS to convert C code back to Verilog. But the tool chain doesn't seem to be mature.
 
-Is it just a piece of verilog code?
+It's no surprise that Verilog is the best suited to model hardware, since it is a hardware description language. Why do we need C or SystemC to describe hardware? SystemC is really just for speeding up the software development process by modeling the SoC. SystemC model suppose to be identical to the hardware. So the proper order is to develop Verilog first, creating the architecture. Then translate it into SystemC for software driver development.
 
-Yes, we can use Vivado HLS to convert C code to Verilog. But the tool chain doesn't seem to be mature.
+The usefulness of SystemC model really comes from being exact match with the hardware. This allows the programmer to probe every part of the hardware, it's good for debugging, performance tuning, and power tuning. As measuring timing using the real hardware is hard. We will need real hardware timing module to profiling different part of the hardware, this by itself will introduce error. However, there is one advantage of using hardware, it will be fast. But SystemC can be optimized to run fast, and it's software, we can change it anytime.
 
-Verilog is the best suited to model hardware, since it is a hardware description language. Why do we need C or SystemC to describe hardware? SystemC is really just for speeding up the software development process by modeling the SoC. SystemC model suppose to be identical to the hardware. So the proper order is to develop Verilog first, creating the architecture first. Then translate it into SystemC for software driver development.
+There are RISC-V verilog implementation exist on the web, but they doesn't seem to implement the whole instruction set. Also, since we will be the architect that design the processor, it bettter to wirte our own implementation to get a good idea on what it looks like down to every detail.
 
-The usefulness of SystemC model really comes from be exact match with the hardware. This allows the programmer to probe every part of the hardware, it's good for debugging, performance tuning, and power tuning. As measuring timing using the real hardware is hard. We will need real hardware timing module to profiling different part of the hardware, this by itself will introduce error. However, there is one advantage of using hardware, it will be fast. But SystemC can be optimized to run fast, and it's software, we can change it anytime.
+We will use Verilog to create an architecture that use the RISC-V ISA. Then use SystemC to create a software model for it. Then run some real software on it to gauge the performance of the architecture.
 
+## SystemC video tutorial
 
-I will use Verilog to create an architecture that confront the RISC-V ISA. Then use SystemC to create a software model for it.
+I found some videos about it here: http://videos.accellera.org/tlm20sdvvirtual/
 
-There are RISC-V verilog implementation exist.
+It's not easy to find using google.
 
 ## DSP Architecture
 
