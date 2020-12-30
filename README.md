@@ -1,5 +1,57 @@
 This is a readme about my simulator
 
+# Notes
+
+## Introduction
+
+Here is an un-pipelined architecture adhere to RISC-V ISA. Two identical architecture models were created, one in Verilog and the other one in SystemC. Verilog language is a little more concise when it comes to describing hardware. However SystemC is not that convoluted either, given there are a lot of c++ marco to help. 
+
+One big advantage for SystemC is the integrated testing and hardware description. After we wrote a model using SystemC, we can easily test it. Because the described hardware and signals are all just some variables in C++. We can even hook it up to a database if we want. SQLite has well documented C++ API ready to be used.
+
+On the other hand, Verilog testing is a little bit more difficult. We used Vivado Verilog Simulator. The simulator can handle Verilog very well, it can also draw the waveform in a few button clicks. But it's a bit harder when it comes to verification. In short, it's difficult to write Verilog code to check all the wire values and give me a console print in the end to tell me: some part of my architecture is ulterly broken -- go fix it.
+
+Here is my thought how to check the architecture. It's infeasiable to check each individual wire and waveform in the architecture, there are just too many. And we don't need to check each individual wire. At the end of the day, we want to adhere to the ISA. The ISA states the form of the input(insturcions), and it's expecting some output. The output can be writting to register file, or write to DRAM(Load and Store). So, we wrote testbenchs to exercise each instuction and examine the register file content and output bus content after each instuction executed. Manually checking those results on waveform from Vivado, or text output from SystemC is too time consuming. Ideally, we want a program to check it. 
+
+For Verilog in Vivado, it's a bit different. We need to write Tcl script. I was able to create Tcl script to check register file and output bus. 
+
+For SystemC, everything is in C++, architecture and the verification.
+
+## SystemC Environment Setup
+
+Here is my experience on setting up SystemC using Windows 10.
+
+I downloaded the SystemC library from here: https://accellera.org/downloads/standards/systemc
+
+At the time of writting, I downloaded Core SystemC Language and Examples (.zip) file. The Item name, or version number is SystemC 2.3.3 (Includes TLM).
+
+I also downloaded Visual Studio C++ from here: https://visualstudio.microsoft.com/vs/features/cplusplus/
+
+
+After extracting the SystemC zip file, the top directory has the following files and directories:
+
+    aclocal.m4  CMakeLists.txt  docs/      Makefile.am  NOTICE
+    AUTHORS     config/         examples/  Makefile.in  README
+    ChangeLog   configure*      INSTALL    msvc10/      RELEASENOTES
+    cmake/      configure.ac    LICENSE    NEWS         src/
+
+The INSTALL file is really helpfull. In the Installation Notes for Windows Section, it first asks you to build systemc.lib, I didn't meet any issue there. Then it ask you to build the examples, it failed in my case. 
+
+After some sniffing around, I solved it.
+
+From the top directory, go to examples/sysc folder, it has the following files:
+
+    2.1/            fft/         Makefile.in  README.txt  simple_bus/
+    2.3/            fir/         pipe/        risc_cpu/   simple_fifo/
+    CMakeLists.txt  Makefile.am  pkt_switch/  rsa/        simple_perf/
+
+In the README.txt, last paragraph, it wants us to setup SYSTEMC_HOME and MSVC macro, or environment variable. Let's do that.
+
+After searching online, I found this microsoft documentation: https://docs.microsoft.com/en-us/cpp/build/working-with-project-properties?view=msvc-160#:~:text=%20To%20create%20a%20user-defined%20macro%20%201,select%20the%20Set%20this%20macro%20as...%20More%20
+
+In the To create a user-defined macro section, it tells us how to set up macro. Then I defined the macros using the path of my SystemC installation. Then everything built smoothly. 
+
+The INSTAL file in the top directory also had a section on Creating SystemC Applications, follow that. Also, when I created my own SystemC application, I needed to create new property page and set those marcos again.
+
 # Tasks
 
 ## Create a SystemC model for our little architecture
@@ -86,6 +138,17 @@ The usefulness of SystemC model really comes from being exact match with the har
 There are RISC-V verilog implementation exist on the web, but they doesn't seem to implement the whole instruction set. Also, since we will be the architect that design the processor, it bettter to wirte our own implementation to get a good idea on what it looks like down to every detail.
 
 We will use Verilog to create an architecture that use the RISC-V ISA. Then use SystemC to create a software model for it. Then run some real software on it to gauge the performance of the architecture.
+
+## SQLite Database
+
+I found it here: https://www.sqlite.org/cintro.html
+
+Well documented database software, opensource.
+
+## SystemC Verification Library
+I found it here: https://www.design-reuse.com/articles/4975/systemc-verification-library-speeds-transaction-based-verification.html
+
+The most interesting part about this verification library is it stores the transaction history in a databse, so we can check function coverage and correctness later. But there isn't much documentation on the web. And why can't we just use SQLite database for c++? The SQLite database is widely used for web applications and other things, a lot of documentation, presumably the database codes are well maintained. 
 
 ## SystemC video tutorial
 

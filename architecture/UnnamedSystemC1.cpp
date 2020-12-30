@@ -3,109 +3,6 @@
 
 #include <systemc.h>
 
-//class write_if : virtual public sc_interface
-//{
-//public:
-//    virtual void write(char) = 0;
-//    virtual void reset() = 0;
-//};
-//
-//class read_if : virtual public sc_interface
-//{
-//public:
-//    virtual void read(char&) = 0;
-//    virtual int num_available() = 0;
-//};
-//
-//class fifo : public sc_channel, public write_if, public read_if
-//{
-//public:
-//    fifo(sc_module_name name) : sc_channel(name), num_elements(0), first(0) {}
-//
-//    void write(char c) {
-//        if (num_elements == max)
-//            wait(read_event);
-//
-//        data[(first + num_elements) % max] = c;
-//        ++num_elements;
-//        write_event.notify();
-//    }
-//
-//    void read(char& c) {
-//        if (num_elements == 0)
-//            wait(write_event);
-//
-//        c = data[first];
-//        --num_elements;
-//        first = (first + 1) % max;
-//        read_event.notify();
-//    }
-//
-//    void reset() { num_elements = first = 0; }
-//
-//    int num_available() { return num_elements; }
-//
-//private:
-//    enum e { max = 10 };
-//    char data[max];
-//    int num_elements, first;
-//    sc_event write_event, read_event;
-//};
-//
-//class producer : public sc_module
-//{
-//public:
-//    sc_port<write_if> out;
-//
-//    SC_HAS_PROCESS(producer);
-//
-//    producer(sc_module_name name) : sc_module(name)
-//    {
-//        SC_THREAD(main);
-//    }
-//
-//    void main()
-//    {
-//        const char* str =
-//            "Visit www.accellera.org and see what SystemC can do for you today!\n";
-//
-//        while (*str)
-//            out->write(*str++);
-//
-//        sc_stop();
-//    }
-//};
-//
-//class consumer : public sc_module
-//{
-//public:
-//    sc_port<read_if> in;
-//
-//    SC_HAS_PROCESS(consumer);
-//
-//    consumer(sc_module_name name) : sc_module(name)
-//    {
-//        SC_THREAD(main);
-//    }
-//
-//    void main()
-//    {
-//        char c;
-//        cout << endl << endl;
-//
-//        while (true) {
-//            in->read(c);
-//            cout << c << flush;
-//
-//            if (in->num_available() == 1)
-//                cout << "<1>" << flush;
-//            if (in->num_available() == 9)
-//                cout << "<9>" << flush;
-//        }
-//    }
-//};
-
-
 class register_file : sc_module
 {
 public:
@@ -218,6 +115,7 @@ public:
                 break;
             case 0b0010111: // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
                 wr_data.write((immediate.read() << 12) + PC.read());
+                wr_pc.write((immediate.read() << 12) + PC.read());
                 break;
             default:
                 break;
@@ -386,10 +284,13 @@ public:
     sc_in<unsigned> 		out_bus;    // receive output from cpu
 
     sc_in_clk 			clk;
+    
+    bool        stopped;
 
     //Constructor
     SC_CTOR(test_bench) {
         SC_CTHREAD(entry, clk.neg());
+        stopped = false;
     }
 
     // Process functionality in member function below
@@ -412,32 +313,19 @@ public:
             rst.write(false);
             wait(3);
 
+            inst.write((0x22222 << 12) | (1 << 7) | 0b0010111);
+            in_bus.write(58);
+            rst.write(false);
+            wait(3);
+            
             wait(16);
+            stopped = true;
             sc_stop();
 
         }
 
     }
 };
-
-//class top : public sc_module
-//{
-//public:
-//    fifo* fifo_inst;
-//    producer* prod_inst;
-//    consumer* cons_inst;
-//
-//    top(sc_module_name name) : sc_module(name)
-//    {
-//        fifo_inst = new fifo("Fifo1");
-//
-//        prod_inst = new producer("Producer1");
-//        prod_inst->out(*fifo_inst);
-//
-//        cons_inst = new consumer("Consumer1");
-//        cons_inst->in(*fifo_inst);
-//    }
-//};
 
 int sc_main(int, char* []) {
 
@@ -515,10 +403,19 @@ int sc_main(int, char* []) {
     TB.clk(clk);
 
     cout << "Register1 " << std::hex << RF.registers[1] << endl;
-    //top top1("Top1");
 
-    for (int i = 0; i < 60; i++)
+
+    
+    unsigned old_PC = 0;
+    int inst_tb = 0;
+    int i = 0;
+    while(true)
     {
+        if (TB.stopped == true) // cause error if call sc_start after sc_stop being called in TB
+        {
+            break;
+        }
+
         sc_start(250, SC_PS);
         cout << std::dec << (i+1)*250 << "ps";
         cout << ((i + 1) * 250 % 1000 == 250 ? " --- posedge outcome" : "") << endl;
@@ -534,10 +431,50 @@ int sc_main(int, char* []) {
         cout << "wr_data: " << std::hex << RF.wr_data.read() << endl;
         cout << "Register1 " << std::hex << RF.registers[1] << endl;
         cout << endl;
+
+        if ((i + 1) * 250 % 1000 == 250)
+        {
+            // PC changed at this posedge, meaning one insturction finished, let's check result
+            if (CTRL.PC.read() != old_PC)
+            {
+                cout << "check instruction outcome!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << endl << endl;
+
+                switch (inst_tb)
+                {
+                case 0:
+                    if (!(RF.registers[1] == 0x1234A000))
+                    {
+                        cout << "Verification Failed" << endl;
+                        sc_stop();
+                    } 
+                    break;
+                case 1:
+                    if (!(RF.registers[1] == 0xBEEF0000))
+                    {
+                        cout << "Verification Failed" << endl;
+                        sc_stop();
+                    }
+                    break;
+                case 2:
+                    if (!( (RF.registers[1] == (0x22222000 + old_PC)) && CTRL.PC.read() == (0x22222000 + old_PC) ))
+                    {
+                        cout << "Verification Failed" << endl;
+                        sc_stop();
+                    }
+                    break;
+                default:
+                    break;
+                }
+                inst_tb++;
+            }
+        }
+        old_PC = CTRL.PC.read();
+        i++;
     }
 
-    sc_start();
     
     cout << "Register1 " << std::hex << RF.registers[1] << endl;
+
+    cout << "Verification Successed" << endl;
     return 0;
 }
