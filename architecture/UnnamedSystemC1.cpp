@@ -3,107 +3,107 @@
 
 #include <systemc.h>
 
-class write_if : virtual public sc_interface
-{
-public:
-    virtual void write(char) = 0;
-    virtual void reset() = 0;
-};
-
-class read_if : virtual public sc_interface
-{
-public:
-    virtual void read(char&) = 0;
-    virtual int num_available() = 0;
-};
-
-class fifo : public sc_channel, public write_if, public read_if
-{
-public:
-    fifo(sc_module_name name) : sc_channel(name), num_elements(0), first(0) {}
-
-    void write(char c) {
-        if (num_elements == max)
-            wait(read_event);
-
-        data[(first + num_elements) % max] = c;
-        ++num_elements;
-        write_event.notify();
-    }
-
-    void read(char& c) {
-        if (num_elements == 0)
-            wait(write_event);
-
-        c = data[first];
-        --num_elements;
-        first = (first + 1) % max;
-        read_event.notify();
-    }
-
-    void reset() { num_elements = first = 0; }
-
-    int num_available() { return num_elements; }
-
-private:
-    enum e { max = 10 };
-    char data[max];
-    int num_elements, first;
-    sc_event write_event, read_event;
-};
-
-class producer : public sc_module
-{
-public:
-    sc_port<write_if> out;
-
-    SC_HAS_PROCESS(producer);
-
-    producer(sc_module_name name) : sc_module(name)
-    {
-        SC_THREAD(main);
-    }
-
-    void main()
-    {
-        const char* str =
-            "Visit www.accellera.org and see what SystemC can do for you today!\n";
-
-        while (*str)
-            out->write(*str++);
-
-        sc_stop();
-    }
-};
-
-class consumer : public sc_module
-{
-public:
-    sc_port<read_if> in;
-
-    SC_HAS_PROCESS(consumer);
-
-    consumer(sc_module_name name) : sc_module(name)
-    {
-        SC_THREAD(main);
-    }
-
-    void main()
-    {
-        char c;
-        cout << endl << endl;
-
-        while (true) {
-            in->read(c);
-            cout << c << flush;
-
-            if (in->num_available() == 1)
-                cout << "<1>" << flush;
-            if (in->num_available() == 9)
-                cout << "<9>" << flush;
-        }
-    }
-};
+//class write_if : virtual public sc_interface
+//{
+//public:
+//    virtual void write(char) = 0;
+//    virtual void reset() = 0;
+//};
+//
+//class read_if : virtual public sc_interface
+//{
+//public:
+//    virtual void read(char&) = 0;
+//    virtual int num_available() = 0;
+//};
+//
+//class fifo : public sc_channel, public write_if, public read_if
+//{
+//public:
+//    fifo(sc_module_name name) : sc_channel(name), num_elements(0), first(0) {}
+//
+//    void write(char c) {
+//        if (num_elements == max)
+//            wait(read_event);
+//
+//        data[(first + num_elements) % max] = c;
+//        ++num_elements;
+//        write_event.notify();
+//    }
+//
+//    void read(char& c) {
+//        if (num_elements == 0)
+//            wait(write_event);
+//
+//        c = data[first];
+//        --num_elements;
+//        first = (first + 1) % max;
+//        read_event.notify();
+//    }
+//
+//    void reset() { num_elements = first = 0; }
+//
+//    int num_available() { return num_elements; }
+//
+//private:
+//    enum e { max = 10 };
+//    char data[max];
+//    int num_elements, first;
+//    sc_event write_event, read_event;
+//};
+//
+//class producer : public sc_module
+//{
+//public:
+//    sc_port<write_if> out;
+//
+//    SC_HAS_PROCESS(producer);
+//
+//    producer(sc_module_name name) : sc_module(name)
+//    {
+//        SC_THREAD(main);
+//    }
+//
+//    void main()
+//    {
+//        const char* str =
+//            "Visit www.accellera.org and see what SystemC can do for you today!\n";
+//
+//        while (*str)
+//            out->write(*str++);
+//
+//        sc_stop();
+//    }
+//};
+//
+//class consumer : public sc_module
+//{
+//public:
+//    sc_port<read_if> in;
+//
+//    SC_HAS_PROCESS(consumer);
+//
+//    consumer(sc_module_name name) : sc_module(name)
+//    {
+//        SC_THREAD(main);
+//    }
+//
+//    void main()
+//    {
+//        char c;
+//        cout << endl << endl;
+//
+//        while (true) {
+//            in->read(c);
+//            cout << c << flush;
+//
+//            if (in->num_available() == 1)
+//                cout << "<1>" << flush;
+//            if (in->num_available() == 9)
+//                cout << "<9>" << flush;
+//        }
+//    }
+//};
 
 
 class register_file : sc_module
@@ -152,7 +152,7 @@ public:
                     printf("** ERROR ** REGISTER FILE: Two write ports addresses are different, write failed\n");
                 }
 
-                wait();
+                //wait();
                 registers[address1] = wr_data.read();
 
             }
@@ -161,7 +161,7 @@ public:
                 if (rd1 == true)
                 {
                     // Read port 1 operation
-                    wait();
+                    //wait();
                     rd_data1.write(registers[address1]);
 
                 }
@@ -169,7 +169,7 @@ public:
                 if (rd2 == true)
                 {
                     // Read port 1 operation
-                    wait();
+                    //wait();
                     rd_data2.write(registers[address2]);
                 }
             }
@@ -183,26 +183,265 @@ public:
 };
 
 
-class top : public sc_module
+class data_path : sc_module
 {
 public:
-    fifo* fifo_inst;
-    producer* prod_inst;
-    consumer* cons_inst;
+    sc_in<unsigned>  		dp_ctrl;  	// data path control signal
+    sc_out<unsigned> 		wr_data;  	// write to register file
+    sc_out<unsigned> 		wr_pc;  	// write to program counter
 
-    top(sc_module_name name) : sc_module(name)
-    {
-        fifo_inst = new fifo("Fifo1");
+    sc_in<unsigned> 		PC;  	    // program counter from control unit
 
-        prod_inst = new producer("Producer1");
-        prod_inst->out(*fifo_inst);
+    sc_in<unsigned> 		rd_data1;  	// register file data input from read port 1
+    sc_in<unsigned> 		rd_data2;  	// register file data input from read port 2
+    sc_in<unsigned> 		immediate;  // immediate from control unit
+    sc_in<unsigned> 		in_bus;  	// receive data from outside, DRAM, etc
+    sc_out<unsigned> 		out_bus;  	// transmit data to outside, DRAM, etc
 
-        cons_inst = new consumer("Consumer1");
-        cons_inst->in(*fifo_inst);
+    sc_in_clk 			clk;
+
+    //Constructor
+    SC_CTOR(data_path) {
+        SC_CTHREAD(entry, clk.pos());
+    }
+
+    // Process functionality in member function below
+    void entry() {
+
+        while (true) {
+            wait();
+
+            switch (dp_ctrl.read())
+            {
+            case 0b0110111: // LUI (Load Upper Immediate) Spec. PDF-Page 37 )
+                wr_data.write(immediate.read() << 12);
+                break;
+            case 0b0010111: // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
+                wr_data.write((immediate.read() << 12) + PC.read());
+                break;
+            default:
+                break;
+            }
+
+        }
+
     }
 };
 
+class control : sc_module
+{
+public:
+    sc_in<bool>             rst;            // reset
+    sc_in<unsigned> 		inst;  	        // instruction for cpu
+
+    sc_out<unsigned>  		addr1;  		// address1 for register file port 1
+    sc_out<unsigned>  		addr2;  		// address1 for register file port 2
+    sc_out<bool>  			rd1;    		// register file read port 1 enable
+    sc_out<bool>  			rd2;    		// register file read port 2 enable
+    sc_out<bool>  			wr1;    		// register file write port 1 enable
+    sc_out<bool>  			wr2;    		// register file write port 2 enable
+
+    sc_out<unsigned>  		dp_ctrl;  	    // generate data path control signal
+    sc_out<unsigned> 		immediate;      // generate immediate from instruction to datapath
+    sc_out<unsigned> 		PC;  	        // keep track of program counter
+    sc_in<unsigned> 		wr_pc;  	    // calculated new program counter from datapath
+
+    sc_in_clk 			clk;
+
+
+    // Parameter
+    unsigned pc;
+    unsigned saved_inst;	 			    // Saved instruction
+    unsigned state;	 			            // control unit state
+    static const unsigned s0 = 0b00;
+    static const unsigned s1 = 0b01;
+    static const unsigned s2 = 0b11;
+    static const unsigned s3 = 0b10;        // Use Gray coding for states for more efficient synthesis
+
+
+    //Constructor
+    SC_CTOR(control) {
+        SC_CTHREAD(entry, clk.pos());
+        pc = 0;
+        saved_inst = 0;
+        state = s0;
+    }
+
+    // Process functionality in member function below
+    void entry() {
+
+        while (true) {
+            wait();
+
+            if (rst.read())
+            {
+                PC.write(0x00000000);
+                pc = 0;
+                state = s0;
+            }
+            else
+            {
+                
+                switch (state)
+                {
+                case s0:    // Cycle 1 -- Decode
+                    dp_ctrl.write(0x0);
+                    wr1.write(false);
+                    wr2.write(false);
+                    saved_inst = inst.read();
+                    state = s1;
+
+                    switch (inst.read() & 0x7f) 
+                    {
+                    case 0b0110111: // LUI (Load Upper Immediate) Spec. PDF-Page 37
+                        rd1.write(false);
+                        rd2.write(false);
+                        break;
+                    case 0b0010111: // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
+                        rd1.write(false);
+                        rd2.write(false);
+                        break;
+                    default:
+                        rd1.write(false);
+                        rd2.write(false);
+                        break;
+                    }
+
+                    break;
+                case s1:    // Cycle 2 -- fetch operands from register file
+                    dp_ctrl.write(saved_inst & 0x7f);
+                    state = s2;
+
+                    switch (saved_inst & 0x7f)
+                    {
+                    case 0b0110111: // LUI (Load Upper Immediate) Spec. PDF-Page 37
+                        immediate.write(saved_inst >> 12);
+                        break;
+                    case 0b0010111: // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
+                        immediate.write(saved_inst >> 12);
+                        break;
+                    default:
+                        break;
+                    }
+                    break;
+                case s2:    // Cycle 3 -- perform datapath operation
+                    rd1.write(false);
+                    rd2.write(false);
+                    state = s3;
+
+                    switch (saved_inst & 0x7f)
+                    {
+                    case 0b0110111: // LUI (Load Upper Immediate) Spec. PDF-Page 37
+                        wr1.write(true);
+                        wr2.write(true);
+                        addr1.write((saved_inst >> 7) & 0x1f);
+                        addr2.write((saved_inst >> 7) & 0x1f);
+                        break;
+                    case 0b0010111: // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
+                        wr1.write(true);
+                        wr2.write(true);
+                        addr1.write((saved_inst >> 7) & 0x1f);
+                        addr2.write((saved_inst >> 7) & 0x1f);
+                        break;
+                    default:
+                        wr1.write(false);
+                        wr2.write(false);
+                        break;
+                    }
+                    break;
+                case s3:    // Cycle 4 -- write back
+                    rd1.write(false);
+                    rd2.write(false);
+                    wr1.write(false);
+                    wr2.write(false);
+                    state = s0;
+
+                    switch (saved_inst & 0x7f)
+                    {
+                    case 0b0010111: // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
+                        pc = wr_pc.read();
+                        PC.write(pc);
+                        break;
+                    default:
+                        pc++;
+                        PC.write(pc);
+                        break;
+                    }
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+
+    }
+};
+
+class test_bench : sc_module
+{
+public:
+    sc_out<bool>  			rst;    	// reset
+    sc_out<unsigned> 		inst;  	    // generate instruction for cpu
+    sc_out<unsigned> 		in_bus;  	// generate input for cpu
+    sc_in<unsigned> 		out_bus;    // receive output from cpu
+
+    sc_in_clk 			clk;
+
+    //Constructor
+    SC_CTOR(test_bench) {
+        SC_CTHREAD(entry, clk.neg());
+    }
+
+    // Process functionality in member function below
+    void entry() {
+
+        while (true) {
+            wait();
+            inst.write(0x00000000);
+            in_bus.write(58);
+            rst.write(true);
+
+            wait();
+            inst.write((0x1234A << 12) | (1 << 7) | 0b0110111);
+            in_bus.write(58);
+            rst.write(false);
+            wait(3);
+
+            inst.write((0xBEEF0 << 12) | (1 << 7) | 0b0110111);
+            in_bus.write(58);
+            rst.write(false);
+            wait(3);
+
+            wait(16);
+            sc_stop();
+
+        }
+
+    }
+};
+
+//class top : public sc_module
+//{
+//public:
+//    fifo* fifo_inst;
+//    producer* prod_inst;
+//    consumer* cons_inst;
+//
+//    top(sc_module_name name) : sc_module(name)
+//    {
+//        fifo_inst = new fifo("Fifo1");
+//
+//        prod_inst = new producer("Producer1");
+//        prod_inst->out(*fifo_inst);
+//
+//        cons_inst = new consumer("Consumer1");
+//        cons_inst->in(*fifo_inst);
+//    }
+//};
+
 int sc_main(int, char* []) {
+
+    // ************************ Register File ***********************************
     sc_signal<unsigned>  		rf_addr1("RF_ADDR1");  		// physical address1
     sc_signal<unsigned>  		rf_addr2("RF_ADDR2");  		// physical address2
     sc_signal<bool>  			rf_rd1("RF_READ1");    		// read enable 1
@@ -214,8 +453,20 @@ int sc_main(int, char* []) {
     sc_signal<unsigned> 		rf_rd_data1("RF_RD_DATA1");  	// register file data output read port 1
     sc_signal<unsigned> 		rf_rd_data2("RF_RD_DATA2");  	// register file data output read port 2
 
+    // ************************ Data Path ***********************************
+    sc_signal<unsigned>  		dp_dp_ctrl("DP_CTRL");  	// data path control signal
+    sc_signal<unsigned> 		dp_wr_pc("DP_WRITE_PC");  	// data path write to program counter
+    sc_signal<unsigned> 		dp_in_bus("DP_INPUT_BUS");  	// data path receive data from outside, DRAM, etc
+    sc_signal<unsigned> 		dp_out_bus("DP_OUTPUT_BUS");  	// data path transmit data to outside, DRAM, etc
 
-    sc_clock clk("Clock", 1, SC_NS, 0.5, 0.0, SC_NS);
+    // ************************ Control ***********************************
+    sc_signal<bool>             ctrl_rst("CTRL_RESET");            // reset
+    sc_signal<unsigned> 		ctrl_inst("CTRL_INSTRUCTION");  	        // instruction for cpu
+    sc_signal<unsigned> 		ctrl_immediate("CTRL_IMMEDIATE");      // generate immediate from instruction to datapath
+    sc_signal<unsigned> 		ctrl_PC("CTRL_PROGRAM_COUNTER");  	        // keep track of program counter
+
+
+    sc_clock clk("Clock", 1, SC_NS, 0.5, 0.0, SC_NS); // 1ns period, 0.5 duty cycle, start at 0ns
 
     register_file RF("REGISTER_FILE_BLOCK");
     RF.addr1(rf_addr1);  		// physical address1
@@ -224,16 +475,69 @@ int sc_main(int, char* []) {
     RF.rd2(rf_rd2);    		// read enable 2
     RF.wr1(rf_wr1);    		// write enable 1
     RF.wr2(rf_wr2);    		// write enable 2
-
     RF.wr_data(rf_wr_data);  	// register file data input
     RF.rd_data1(rf_rd_data1);  	// register file data output read port 1
     RF.rd_data2(rf_rd_data2);  	// register file data output read port 2
-    
     RF.clk(clk);
 
+    data_path DP("DATA_PATH_BLOCK");
+    DP.dp_ctrl(dp_dp_ctrl);  	// data path control signal
+    DP.wr_data(rf_wr_data);  	// write to register file
+    DP.wr_pc(dp_wr_pc);  	    // write to program counter
+    DP.PC(ctrl_PC);  	        // program counter from control unit
+    DP.rd_data1(rf_rd_data1);  	// register file data input from read port 1
+    DP.rd_data2(rf_rd_data2);  	// register file data input from read port 2
+    DP.immediate(ctrl_immediate);             // immediate from control unit
+    DP.in_bus(dp_in_bus);  	    // receive data from outside, DRAM, etc
+    DP.out_bus(dp_out_bus);  	// transmit data to outside, DRAM, etc
+    DP.clk(clk);
 
+    control CTRL("CONTROL_BLOCK");
+    CTRL.rst(ctrl_rst);         // reset
+    CTRL.inst(ctrl_inst);  	    // instruction for cpu
+    CTRL.addr1(rf_addr1);  		// address1 for register file port 1
+    CTRL.addr2(rf_addr2);  		// address1 for register file port 2
+    CTRL.rd1(rf_rd1);    		// register file read port 1 enable
+    CTRL.rd2(rf_rd2);    		// register file read port 2 enable
+    CTRL.wr1(rf_wr1);    		// register file write port 1 enable
+    CTRL.wr2(rf_wr2);    		// register file write port 2 enable
+    CTRL.dp_ctrl(dp_dp_ctrl);  	// generate data path control signal
+    CTRL.immediate(ctrl_immediate);      // generate immediate from instruction to datapath
+    CTRL.PC(ctrl_PC);  	        // keep track of program counter
+    CTRL.wr_pc(dp_wr_pc);  	    // calculated new program counter from datapath
+    CTRL.clk(clk);
 
-    top top1("Top1");
+    test_bench TB("TEST_BENCH");
+    TB.rst(ctrl_rst);    	    // reset
+    TB.inst(ctrl_inst);  	    // generate instruction for cpu
+    TB.in_bus(dp_in_bus);  	    // generate input for cpu
+    TB.out_bus(dp_out_bus);     // receive output from cpu
+    TB.clk(clk);
+
+    cout << "Register1 " << std::hex << RF.registers[1] << endl;
+    //top top1("Top1");
+
+    for (int i = 0; i < 60; i++)
+    {
+        sc_start(250, SC_PS);
+        cout << std::dec << (i+1)*250 << "ps";
+        cout << ((i + 1) * 250 % 1000 == 250 ? " --- posedge outcome" : "") << endl;
+        cout << "Clock: " << clk.read() << endl;
+        cout << "Instruction: " << std::hex << TB.inst.read() << endl;
+        cout << "Instruction Saved: " << std::hex << CTRL.saved_inst << endl;
+        cout << "Reset: " << TB.rst.read() << endl;
+        cout << "In_bus: " << std::hex << TB.in_bus.read() << endl;
+        cout << "dp_ctrl: " << std::hex << CTRL.dp_ctrl.read() << endl;
+        cout << "PC: " << std::hex << CTRL.PC.read() << endl;
+        cout << "ctrl_state: " << CTRL.state << endl;
+        cout << "ctrl_immediate: " << std::hex << CTRL.immediate.read() << endl;
+        cout << "wr_data: " << std::hex << RF.wr_data.read() << endl;
+        cout << "Register1 " << std::hex << RF.registers[1] << endl;
+        cout << endl;
+    }
+
     sc_start();
+    
+    cout << "Register1 " << std::hex << RF.registers[1] << endl;
     return 0;
 }
