@@ -60,14 +60,17 @@ module tb(
 //		#10 dp_ctrl <= 7'b0001000; rd_data1 <= 16'd58; rd_data2 <= 16'd56; in_bus <= 16'd12;
     
         // main
-        #10 inst <= 32'h00000000; in_bus <= 32'd58; rst <= 1'b0;
+        #10 inst <= 32'h00000000; in_bus <= 32'd58; rst <= 1'b0; 
         #10; #10; #10;
         
-        #10 inst <= {20'h1234A, 5'b00001, 7'b0110111}; in_bus <= 32'd58;
-        #10;
-        #10;
-        #10;
+        #10 inst <= {20'h1234A, 5'b00001, 7'b0110111}; in_bus <= 32'd58; // LUI (Load Upper Immediate) Spec. PDF-Page 37 )
+        #10; #10; #10;
         
+        #10 inst <= {20'h22222, 5'b00001, 7'b0010111}; in_bus <= 32'd58; // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
+        #10; #10; #10;
+        
+        #10 inst <= {20'h22222, 5'b00001, 7'b1101111}; in_bus <= 32'd58; // JAL (Jump And Link) Spec. PDF-Page 39 )
+        #10; #10; #10;
 		
 		#50 $finish;            // Quit the simulation
 	end

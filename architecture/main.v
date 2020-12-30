@@ -117,8 +117,15 @@ begin
 	else if (dp_ctrl == 7'b0110111) // LUI (Load Upper Immediate) Spec. PDF-Page 37 )
 	    wr_data <= {immediate, 12'b0};
 	else if (dp_ctrl == 7'b0010111) // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
+	begin
 	    wr_data <= {immediate, 12'b0} + PC;
 	    wr_pc <= {immediate, 12'b0} + PC;
+	end
+	else if (dp_ctrl == 7'b1101111) // JAL (Jump And Link) Spec. PDF-Page 39 )
+	begin
+	    wr_data <= 32'd4 + PC;
+	    wr_pc <= {{11{immediate[19]}}, immediate, 1'b0} + PC;
+	end
 end
 
 endmodule
@@ -238,6 +245,11 @@ begin
                             rd1 <= 0;
                             rd2 <= 0;
                         end
+                    7'b1101111: // JAL (Jump And Link) Spec. PDF-Page 39 )
+                        begin
+                            rd1 <= 0;
+                            rd2 <= 0;
+                        end
                         
                 endcase
             end
@@ -303,6 +315,10 @@ begin
                     7'b0010111: // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
                         begin
                             immediate <= saved_inst[31:12];
+                        end
+                    7'b1101111: // JAL (Jump And Link) Spec. PDF-Page 39 )
+                        begin
+                            immediate <= {saved_inst[31], saved_inst[19:12], saved_inst[20], saved_inst[30:21]};
                         end
                     
                 endcase
@@ -374,6 +390,13 @@ begin
                         addr1 <= saved_inst[11:7];
                         addr2 <= saved_inst[11:7];
                     end
+                    7'b1101111: // JAL (Jump And Link) Spec. PDF-Page 39 )
+                    begin
+                        wr1 <= 1;
+                        wr2 <= 1;	
+                        addr1 <= saved_inst[11:7];
+                        addr2 <= saved_inst[11:7];
+                    end
                 endcase
                 
             end
@@ -389,13 +412,17 @@ begin
                     // -------------------------------------- RISC-V --------------------------------------
                     
                     7'b0010111: // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
-                        begin
-                            PC <= wr_pc;
-                        end
+                    begin
+                        PC <= wr_pc;
+                    end
+                    7'b1101111: // JAL (Jump And Link) Spec. PDF-Page 39 )
+                    begin
+                        PC <= wr_pc;
+                    end
                     default:
-                        begin
-                            PC <= PC + 1'b1;
-                        end
+                    begin
+                        PC <= PC + 32'd4;
+                    end
                 endcase
             end
         endcase

@@ -93,21 +93,21 @@ Generate Verilog testbench.\
 
 ## Personal Opinion
 
-So we are going to write a simulator for an integrated circuit. The question that comes to mind is what level of abstraction should we use? Should model at Logic Gate Level(NAND gate, OR gate, etc)? Block Diagram Level(CPU, DRAM, cache)?
+So we are going to write a simulator for an integrated circuit. The question that comes to mind is what level of abstraction should we use? Should we model at Logic Gate Level(NAND gate, OR gate, etc)? Block Diagram Level(CPU, DRAM, cache)?
 
 From Monton's paper and Nivida's video, RISC-V seems to be the new frontier for ISA. Should we use RISC-V as the target for the simulator? Is it going to be very hard and time consuming? I also don't know what the RISC-V architecture looks like. I have a rough idea on what MIPS architecture looks like.
 
-    Can I build a RISC-V simulator without knowledge the RISC-V processor? - NO.\
-    Is writing a simulator a hard task? - YES.\
-    Is learning RISC-V architecture a hard task? - YES.\
+    Can I build a RISC-V simulator without knowledge the RISC-V processor? - NO.
+    Is writing a simulator a hard task? - YES.
+    Is learning RISC-V architecture a hard task? - YES.
     Is doing two hard task at the same time a good idea? - NO.
 
 So how about we just write a simulator for something to start. Then after we get some experience, we can come back and create simulator for RISC-V. But this creates a new question, what simulator should we write for? What's the target for us to model? Let's start from the beginning. 
 
-    What is a simulator and what is it for?\
+    What is a simulator and what is it for?
     It's an incomplete model of the real world. We use it to predict the future with some level of accuracy. 
 
-    What do we want to know about the future of a piece of silicon?\
+    What do we want to know about the future of a piece of silicon?
     We want to know the behavior of the whole system. And see if it matches with our expectation.
 
 Then what exactly is our expection? RISC-V is shiny new and good, but what's it for? If it's not for anything, then why build a simulator for it? Or why did they bother to create a new ISA like RISC-V? Why can't we just use the old ISA?
@@ -120,11 +120,11 @@ Looking at their code, they are using firmware to handle communications between 
 
 They had a picture of their flight controller PCB borad. And there are multiple component, IC, on the flight control board.
 
-From my experience, embedded system firmware development will be really benefit if they can have a simulator that can give clock cycle level of accuracy. Fast to run. Able to see where the code is in the silicon. Preferablly at the gate level or below. Be able to see where the data moves between clock cycle to clock cycle. There is very little, a software developer can do when trying to debug a hardware. He can upload code to the hardware. They can try to create some physical phenomenon to show their code is somewhat working(flash LED, etc). If there is a simulator of the embedded system, then the programmer can see through the silicon and really figure out what's going on in the chip. Idealy ,sensor should have its model and microprocessor should have its model. This way, we can model the whole PCB.
+From my experience, embedded system firmware development will be really benefit if they can have a simulator that can give clock cycle level of accuracy. Fast to run. Able to see where the code is in the silicon. Preferablly at the gate level or below. Be able to see where the data moves between clock cycle to clock cycle. There is very little, a software developer can do when trying to debug a hardware. He can upload code to the hardware. They can try to create some physical phenomenon to show their code is somewhat working(flash LED, etc). If there is a simulator of the embedded system, then the programmer can see through the silicon and really figure out what's going on in the chip. Idealy, sensor should have its model and microprocessor should have its model. This way, we can model the whole PCB.
 
 The role of the simulator is to act as a detailed spec, or interface, or contract between hardware and software. It enables simultaneous development of software and hardware. If they both adhere to the simulator, then there shouldn't be any debugging required during the final convergence of the whole system.
 
-After reading the RISC-V specification in more deatil, it doesn't looks esaier than I thought. The intel processor ISA is thousands pages long, while RISC-V is about one hundred, maybe 50 instructions or so. RISC-V simulator should be very doable. We need a detailed survey of different simulator architecture. We can just roll the C++ code and do whatever our heart desires, but at least seeing a little bit on what others have been doing can avoid some pitfalls.
+After reading the RISC-V specification in more deatil, it looks esaier than I thought. The intel processor ISA is thousands pages long, while RISC-V is about one hundred, maybe 50 instructions or so. RISC-V simulator should be very doable. We need a detailed survey of different simulator architecture. We can just roll the C++ code and do whatever our heart desires, but at least seeing a little bit on what others have been doing can avoid some pitfalls.
 
 Then this is settled. We will make a simulator that can simulate all RISC-V instructions. To get beyond ISA simulation and getting clock cycle accuracy, we need to know the architecture.
 We will also create an architecture for RISC-V using verilog. The simulator should be able to run compiled code from a RISC-V compiler, which I assume should exist somewhere on the web.
