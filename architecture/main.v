@@ -119,7 +119,7 @@ begin
 	else if (dp_ctrl == 7'b0010111) // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
 	begin
 	    wr_data <= {immediate, 12'b0} + PC;
-	    wr_pc <= {immediate, 12'b0} + PC;
+//	    wr_pc <= {immediate, 12'b0} + PC;
 	end
 	else if (dp_ctrl == 7'b1101111) // JAL (Jump And Link) Spec. PDF-Page 39 )
 	begin
@@ -411,10 +411,10 @@ begin
                 case (inst[6:0])
                     // -------------------------------------- RISC-V --------------------------------------
                     
-                    7'b0010111: // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
-                    begin
-                        PC <= wr_pc;
-                    end
+//                    7'b0010111: // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
+//                    begin
+//                        PC <= wr_pc;
+//                    end
                     7'b1101111: // JAL (Jump And Link) Spec. PDF-Page 39 )
                     begin
                         PC <= wr_pc;

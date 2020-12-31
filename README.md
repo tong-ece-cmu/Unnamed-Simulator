@@ -139,6 +139,24 @@ There are RISC-V verilog implementation exist on the web, but they doesn't seem 
 
 We will use Verilog to create an architecture that use the RISC-V ISA. Then use SystemC to create a software model for it. Then run some real software on it to gauge the performance of the architecture.
 
+## RISC-V Compiler Tool Chain
+
+I found it here: https://github.com/riscv/riscv-gnu-toolchain
+
+It needs Ubuntu, and it will take a while to set it up.
+
+## RISC-V other hardware Implementations
+
+I found it here: http://riscv.org.s3-website-us-west-1.amazonaws.com/download.html#tab_rocket_core
+
+Other hardware implementation by berkely. Should be a good reference for what I'm doing.
+
+## RISC-V Assembly Interpreter
+
+I found it here: https://www.cs.cornell.edu/courses/cs3410/2019sp/riscv/interpreter/#
+
+Good for cross validation with my implementation. Found a bug in AUIPC already.
+
 ## SQLite Database
 
 I found it here: https://www.sqlite.org/cintro.html

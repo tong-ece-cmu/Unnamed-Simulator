@@ -30,14 +30,12 @@ module tb(
     reg [31:0] inst;
     reg [31:0] in_bus;
     wire [31:0] out_bus;
+    reg [31:0] inst_memory [0:512];
     
-//    reg [31:0] rd_data1, rd_data2;
-//    wire [31:0] wr_data;
-//    reg [6:0] dp_ctrl;
-//    wire [3:0] addr1, addr2;
-//    wire rd1, rd2, wr1, wr2;
+    
 	// A testbench
 	initial begin
+	   $readmemh("inst1.mem", inst_memory);
 	    // ADD
 //		#10 dp_ctrl <= 6'b000001; rd_data1 <= 16'd20; rd_data2 <= 16'd20; in_bus <= 16'd12;
 		
@@ -66,10 +64,16 @@ module tb(
         #10 inst <= {20'h1234A, 5'b00001, 7'b0110111}; in_bus <= 32'd58; // LUI (Load Upper Immediate) Spec. PDF-Page 37 )
         #10; #10; #10;
         
-        #10 inst <= {20'h22222, 5'b00001, 7'b0010111}; in_bus <= 32'd58; // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
+        #10 inst <= {20'h00800, 5'b00001, 7'b1101111}; in_bus <= 32'd58; // JAL (Jump And Link) Spec. PDF-Page 39 )
         #10; #10; #10;
         
-        #10 inst <= {20'h22222, 5'b00001, 7'b1101111}; in_bus <= 32'd58; // JAL (Jump And Link) Spec. PDF-Page 39 )
+        #10 inst <= {20'hffdff, 5'b00001, 7'b1101111}; in_bus <= 32'd58; // JAL (Jump And Link) Spec. PDF-Page 39 )
+        #10; #10; #10;
+        
+        #10 inst <= {20'h00800, 5'b00001, 7'b1101111}; in_bus <= 32'd58; // JAL (Jump And Link) Spec. PDF-Page 39 )
+        #10; #10; #10;
+        
+        #10 inst <= {20'h22222, 5'b00001, 7'b0010111}; in_bus <= 32'd58; // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
         #10; #10; #10;
 		
 		#50 $finish;            // Quit the simulation
