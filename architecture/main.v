@@ -100,10 +100,6 @@ begin
 	if (dp_ctrl == 7'b0000001)
 		// Add
 		wr_data <= rd_data1 + rd_data2;
-	else if (dp_ctrl == 7'b0010000)
-		// Load
-		wr_data <= in_bus;
-	// TODO: Add cases for remaining instructions
 	else if (dp_ctrl == 7'b0000010)
 	    // R_SHIFT
 	    wr_data <= rd_data1 >> 1;
@@ -181,8 +177,30 @@ begin
 	        else
 	        begin wr_pc <= PC + 32'd4; end
 	    end
-	    
-	    
+	end
+	
+	else if (dp_ctrl == 7'b0000011) // LOAD (Load to Register) Spec. PDF-Page 42 )
+	begin
+	    if (funct3 == 3'b000) // LB (Load Byte)
+	    begin
+	        wr_data <= {{24{in_bus[7]}}, in_bus[7:0]};
+	    end
+	    if (funct3 == 3'b001) // LH (Load Half Word)
+	    begin
+	        wr_data <= {{16{in_bus[15]}}, in_bus[15:0]};
+	    end
+	    if (funct3 == 3'b010) // LW (Load Word)
+	    begin
+	        wr_data <= in_bus;
+	    end
+	    if (funct3 == 3'b100) // LBU (Load Byte Unsigned)
+	    begin
+	        wr_data <= {24'b0, in_bus[7:0]};
+	    end
+	    if (funct3 == 3'b101) // LHU (Load Half Word Unsigned)
+	    begin
+	        wr_data <= {16'b0, in_bus[15:0]};
+	    end
 	end
 end
 
@@ -264,13 +282,6 @@ begin
                             rd2 <= 0;
 //                            next_state = s1;
                         end
-                    7'b0001000: // Load
-                        begin
-                            rd1 <= 0;
-                            rd2 <= 0;
-                            addr1 <= inst[11:8];
-//                            next_state = s1;
-                        end
                     7'b0001001: // Store
                         begin
                             rd1 <= 1;
@@ -309,22 +320,18 @@ begin
                             addr1 <= inst[19:15];
                             addr2 <= inst[24:20];
                         end
-                        
+                    7'b0000011: // LOAD (Load to Register) Spec. PDF-Page 42 )
+                        begin
+                            rd1 <= 1;
+                            rd2 <= 0;
+                            addr1 <= inst[19:15];
+                        end
                 endcase
             end
     
         s1 :	// Cycle 2 -- fetch operands from register file
             begin
-                // TODO:: Add control logic
-    //			dp_ctrl <= 0;
-    //			wr1 <= 0;
-    //			wr2 <= 0;
-    //			addr1 <= inst[7:4];
-    //			addr2 <= inst[3:0];
-    //			rd1 <= 0;
-    //			rd2 <= 0;
-    //			saved_inst <= inst; // Instruction input may not be valid in future clock cycles. So, we save the instruction in an internal register.
-    //			next_state = s0;
+                
                 dp_ctrl  <= saved_inst[6:0];
                 state <= s2;
                 case (saved_inst[6:0])
@@ -351,12 +358,6 @@ begin
                     7'b0000101: // Left shift
                         begin
                             dp_ctrl <= 6'b000100;
-    //						next_state = s2;
-                        end
-                    7'b0001000: // Load
-                        begin
-                            dp_ctrl <= 6'b010000;
-    //						addr1 <= inst[11:8];
     //						next_state = s2;
                         end
                     7'b0001001: // Store
@@ -386,6 +387,11 @@ begin
                     7'b1100011: // BRANCH (Comparasion and Branch) Spec. PDF-Page 40 )
                         begin
                             immediate <= {8'b0, saved_inst[31], saved_inst[7], saved_inst[30:25], saved_inst[11:8]};
+                            funct3 <= saved_inst[14:12];
+                        end
+                    7'b0000011: // LOAD (Load to Register) Spec. PDF-Page 42 )
+                        begin
+                            immediate <= {8'd0, saved_inst[31:20]};
                             funct3 <= saved_inst[14:12];
                         end
                     
@@ -426,11 +432,6 @@ begin
                         wr2 <= 1;
                     end
                     7'b0000101: // Left shift
-                    begin
-                        wr1 <= 1;
-                        wr2 <= 1;
-                    end
-                    7'b0001000: // Load
                     begin
                         wr1 <= 1;
                         wr2 <= 1;
@@ -476,6 +477,13 @@ begin
                     begin
                         wr1 <= 0;
                         wr2 <= 0;
+                    end
+                    7'b0000011: // LOAD (Load to Register) Spec. PDF-Page 42 )
+                    begin
+                        wr1 <= 1;
+                        wr2 <= 1;
+                        addr1 <= saved_inst[11:7];
+                        addr2 <= saved_inst[11:7];
                     end
                 endcase
                 
