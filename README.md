@@ -139,6 +139,12 @@ There are RISC-V verilog implementation exist on the web, but they doesn't seem 
 
 We will use Verilog to create an architecture that use the RISC-V ISA. Then use SystemC to create a software model for it. Then run some real software on it to gauge the performance of the architecture.
 
+I think we are writing too much test. Let's just keep on going to implement new features and leave testing to the end. It should be faster that way. We will use existing C program from the web, compile them to assembly and run them. We can locate bugs by isolating code and back tracing. Segment c code into different block, after each block check all variable values. If some of them are wrong, then some insturctions in this block is causing problem.
+
+Benefit: I don't need to come up with tests for all instructions. It's possible that most of the design is correct. Save time. 
+
+Key assumption: Back tracing bug is easier than creating test cases for instructions. 
+
 ## RISC-V Compiler Tool Chain
 
 I found it here: https://github.com/riscv/riscv-gnu-toolchain

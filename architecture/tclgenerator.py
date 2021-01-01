@@ -105,13 +105,15 @@ output_script = ''
 # JAL x1, 0x00008
 # JAL x1, 0x00008
 # JAL x1, -4
+# JALR x2, x1, 0x8
 # AUIPC x1, 0x22222
 
 if options == 'a':
     output_script = header
     
-    pc = 4; # inital nop skipped
-    for i in range(30):
+    pc = 4 # inital nop skipped
+    r1 = 0
+    for i in range(40):
         output_script += clock_tick()
         output_script += show_out_bus(False, 10)
         
@@ -133,10 +135,15 @@ if options == 'a':
         elif i == 20:
             ja = JAL_Get_jump_address('00800')
             output_script += show_register(1, True, pc + 4)
+            r1 = pc+4
             output_script += show_PC(True, (ja + pc) & 0xffffffff)
             pc = (ja + pc) & 0xffffffff
             print(ja)
         elif i == 24:
+            output_script += show_register(2, True, pc + 4)
+            output_script += show_PC(True, (r1 + 8) & 0xffffffff)
+            pc = (r1 + 8) & 0xffffffff
+        elif i == 28:
             output_script += show_register(1, True, pc + int('22222000', 16))
             output_script += show_PC(True, pc + 4)
             pc += 4

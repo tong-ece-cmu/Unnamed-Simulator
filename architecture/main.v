@@ -119,12 +119,16 @@ begin
 	else if (dp_ctrl == 7'b0010111) // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
 	begin
 	    wr_data <= {immediate, 12'b0} + PC;
-//	    wr_pc <= {immediate, 12'b0} + PC;
 	end
 	else if (dp_ctrl == 7'b1101111) // JAL (Jump And Link) Spec. PDF-Page 39 )
 	begin
 	    wr_data <= 32'd4 + PC;
 	    wr_pc <= {{11{immediate[19]}}, immediate, 1'b0} + PC;
+	end
+	else if (dp_ctrl == 7'b1100111) // JALR (Jump And Link Register) Spec. PDF-Page 39 )
+	begin
+	    wr_data <= 32'd4 + PC;
+	    wr_pc <= {{20{immediate[11]}}, immediate[11:1], 1'b0} + rd_data1;
 	end
 end
 
@@ -149,19 +153,6 @@ reg [1:0] cycle;
 reg [31:0] saved_inst;
 reg [1:0] state, next_state;
 parameter [1:0]s0=2'b00,s1=2'b01,s2=2'b11,s3=2'b10; // Use Gray coding for states for more efficient synthesis
-
-// FSM Control Logic
-// Keeps track of which phase we are in (decode, load, datapath, writeback)
-//always @ (posedge clk)
-//begin
-//    if(rst) begin
-//        PC <= 32'b0;
-//        state <= s0;
-//    end
-//    else begin
-//        state <= next_state;
-//    end
-//end
 
 // FSM
 always @ (posedge clk)
@@ -250,6 +241,12 @@ begin
                             rd1 <= 0;
                             rd2 <= 0;
                         end
+                    7'b1100111: // JALR (Jump And Link Register) Spec. PDF-Page 39 )
+                        begin
+                            rd1 <= 1;
+                            rd2 <= 0;
+                            addr1 <= inst[19:15];
+                        end
                         
                 endcase
             end
@@ -319,6 +316,10 @@ begin
                     7'b1101111: // JAL (Jump And Link) Spec. PDF-Page 39 )
                         begin
                             immediate <= {saved_inst[31], saved_inst[19:12], saved_inst[20], saved_inst[30:21]};
+                        end
+                    7'b1100111: // JALR (Jump And Link Register) Spec. PDF-Page 39 )
+                        begin
+                            immediate <= {8'd0, saved_inst[31:20]};
                         end
                     
                 endcase
@@ -397,6 +398,13 @@ begin
                         addr1 <= saved_inst[11:7];
                         addr2 <= saved_inst[11:7];
                     end
+                    7'b1100111: // JALR (Jump And Link Register) Spec. PDF-Page 39 )
+                    begin
+                        wr1 <= 1;
+                        wr2 <= 1;
+                        addr1 <= saved_inst[11:7];
+                        addr2 <= saved_inst[11:7];
+                    end
                 endcase
                 
             end
@@ -411,11 +419,11 @@ begin
                 case (inst[6:0])
                     // -------------------------------------- RISC-V --------------------------------------
                     
-//                    7'b0010111: // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
-//                    begin
-//                        PC <= wr_pc;
-//                    end
                     7'b1101111: // JAL (Jump And Link) Spec. PDF-Page 39 )
+                    begin
+                        PC <= wr_pc;
+                    end
+                    7'b1100111: // JALR (Jump And Link Register) Spec. PDF-Page 39 )
                     begin
                         PC <= wr_pc;
                     end

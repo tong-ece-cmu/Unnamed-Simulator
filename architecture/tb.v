@@ -73,6 +73,9 @@ module tb(
         #10 inst <= {20'h00800, 5'b00001, 7'b1101111}; in_bus <= 32'd58; // JAL (Jump And Link) Spec. PDF-Page 39 )
         #10; #10; #10;
         
+        #10 inst <= {12'h008, 5'b00001, 3'b000, 5'b00010, 7'b1100111}; in_bus <= 32'd58; // JALR (Jump And Link Register) Spec. PDF-Page 39 )
+        #10; #10; #10;
+        
         #10 inst <= {20'h22222, 5'b00001, 7'b0010111}; in_bus <= 32'd58; // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
         #10; #10; #10;
 		

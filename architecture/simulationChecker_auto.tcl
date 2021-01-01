@@ -331,11 +331,11 @@ puts "time += 10 ns"
 set out_bus [get_value -radix unsigned /tb/out_bus]
 puts "out_bus: $out_bus"
 
-set r_1 [get_value -radix unsigned /tb/main_cpu_module/register_module/registers(1)]
-puts "r_1: $r_1"
-if {$r_1 != 572661780} {
+set r_2 [get_value -radix unsigned /tb/main_cpu_module/register_module/registers(2)]
+puts "r_2: $r_2"
+if {$r_2 != 24} {
     puts "xxxxxxxxxxxx failed xxxxxxxxxxxx"
-    puts "expecting 572661780"
+    puts "expecting 24"
     close_sim
     close_project
 }
@@ -348,6 +348,131 @@ if {$pc != 24} {
     close_sim
     close_project
 }
+
+
+run 10 ns
+puts ""
+puts "time += 10 ns"
+
+set out_bus [get_value -radix unsigned /tb/out_bus]
+puts "out_bus: $out_bus"
+
+set r_1 [get_value -radix unsigned /tb/main_cpu_module/register_module/registers(1)]
+puts "r_1: $r_1"
+
+
+run 10 ns
+puts ""
+puts "time += 10 ns"
+
+set out_bus [get_value -radix unsigned /tb/out_bus]
+puts "out_bus: $out_bus"
+
+set r_1 [get_value -radix unsigned /tb/main_cpu_module/register_module/registers(1)]
+puts "r_1: $r_1"
+
+
+run 10 ns
+puts ""
+puts "time += 10 ns"
+
+set out_bus [get_value -radix unsigned /tb/out_bus]
+puts "out_bus: $out_bus"
+
+set r_1 [get_value -radix unsigned /tb/main_cpu_module/register_module/registers(1)]
+puts "r_1: $r_1"
+
+
+run 10 ns
+puts ""
+puts "time += 10 ns"
+
+set out_bus [get_value -radix unsigned /tb/out_bus]
+puts "out_bus: $out_bus"
+
+set r_1 [get_value -radix unsigned /tb/main_cpu_module/register_module/registers(1)]
+puts "r_1: $r_1"
+if {$r_1 != 572661784} {
+    puts "xxxxxxxxxxxx failed xxxxxxxxxxxx"
+    puts "expecting 572661784"
+    close_sim
+    close_project
+}
+
+set pc [get_value -radix unsigned /tb/main_cpu_module/PC]
+puts "pc: $pc"
+if {$pc != 28} {
+    puts "xxxxxxxxxxxx failed xxxxxxxxxxxx"
+    puts "expecting 28"
+    close_sim
+    close_project
+}
+
+
+run 10 ns
+puts ""
+puts "time += 10 ns"
+
+set out_bus [get_value -radix unsigned /tb/out_bus]
+puts "out_bus: $out_bus"
+
+set r_1 [get_value -radix unsigned /tb/main_cpu_module/register_module/registers(1)]
+puts "r_1: $r_1"
+
+
+run 10 ns
+puts ""
+puts "time += 10 ns"
+
+set out_bus [get_value -radix unsigned /tb/out_bus]
+puts "out_bus: $out_bus"
+
+set r_1 [get_value -radix unsigned /tb/main_cpu_module/register_module/registers(1)]
+puts "r_1: $r_1"
+
+
+run 10 ns
+puts ""
+puts "time += 10 ns"
+
+set out_bus [get_value -radix unsigned /tb/out_bus]
+puts "out_bus: $out_bus"
+
+set r_1 [get_value -radix unsigned /tb/main_cpu_module/register_module/registers(1)]
+puts "r_1: $r_1"
+
+
+run 10 ns
+puts ""
+puts "time += 10 ns"
+
+set out_bus [get_value -radix unsigned /tb/out_bus]
+puts "out_bus: $out_bus"
+
+set r_1 [get_value -radix unsigned /tb/main_cpu_module/register_module/registers(1)]
+puts "r_1: $r_1"
+
+
+run 10 ns
+puts ""
+puts "time += 10 ns"
+
+set out_bus [get_value -radix unsigned /tb/out_bus]
+puts "out_bus: $out_bus"
+
+set r_1 [get_value -radix unsigned /tb/main_cpu_module/register_module/registers(1)]
+puts "r_1: $r_1"
+
+
+run 10 ns
+puts ""
+puts "time += 10 ns"
+
+set out_bus [get_value -radix unsigned /tb/out_bus]
+puts "out_bus: $out_bus"
+
+set r_1 [get_value -radix unsigned /tb/main_cpu_module/register_module/registers(1)]
+puts "r_1: $r_1"
 
 
 run 10 ns
