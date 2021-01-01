@@ -222,6 +222,50 @@ begin
 	        out_bus <= rd_data2;
 	    end
     end
+    
+    else if (dp_ctrl == 7'b0010011) // OP_IMM (Integer Register-Immediate Instructions) Spec. PDF-Page 36 )
+    begin
+        if (funct3 == 3'b000) // ADDI (Add Immediate)
+	    begin
+	       wr_data <= rd_data1 + {{20{immediate[11]}}, immediate[11:0]};
+	    end
+	    
+	    if (funct3 == 3'b010) // SLTI (Set Less Than Immediate)
+	    begin
+	       wr_data <= $signed(rd_data1) < $signed({{20{immediate[11]}}, immediate[11:0]}) ? 32'b1 : 32'b0;
+	    end
+	    if (funct3 == 3'b011) // SLTIU (Set Less Than Immediate Unsigned)
+	    begin
+	       wr_data <= rd_data1 < {{20{immediate[11]}}, immediate[11:0]} ? 32'b1 : 32'b0;
+	    end
+	    if (funct3 == 3'b100) // XORI (XOR Immediate)
+	    begin
+	       wr_data <= {{20{immediate[11]}}, immediate[11:0]} ^ rd_data1;
+	    end
+	    if (funct3 == 3'b110) // ORI (OR Immediate)
+	    begin
+	       wr_data <= {{20{immediate[11]}}, immediate[11:0]} | rd_data1;
+	    end
+	    if (funct3 == 3'b111) // ANDI (AND Immediate)
+	    begin
+	       wr_data <= {{20{immediate[11]}}, immediate[11:0]} & rd_data1;
+	    end
+	    if (funct3 == 3'b001) // SLLI (Shift Left Logic Immediate)
+	    begin
+	       wr_data <= rd_data1 << immediate[4:0];
+	    end
+	    if (funct3 == 3'b101) 
+	    begin
+	       if (immediate[30] == 0) // SRLI (Shift Right Logic Immediate)
+	       begin
+	           wr_data <= rd_data1 >> immediate[4:0];
+	       end
+	       else // SRAI (Shift Right Arithmatic Immediate)
+	       begin 
+	           wr_data <= $signed(rd_data1) >>> immediate[4:0];
+	       end
+	    end
+    end
 end
 
 endmodule
@@ -348,6 +392,12 @@ begin
                             addr1 <= inst[19:15];
                             addr2 <= inst[24:20];
                         end
+                    7'b0010011: // OP_IMM (Integer Register-Immediate Instructions) Spec. PDF-Page 36 )
+                        begin
+                            rd1 <= 1;
+                            rd2 <= 0;
+                            addr1 <= inst[19:15];
+                        end
                 endcase
             end
     
@@ -415,6 +465,11 @@ begin
                     7'b0100011: // STORE (Store to Memory) Spec. PDF-Page 42 )
                         begin
                             immediate <= {8'd0, saved_inst[31:25], saved_inst[11:7]};
+                            funct3 <= saved_inst[14:12];
+                        end
+                    7'b0010011: // OP_IMM (Integer Register-Immediate Instructions) Spec. PDF-Page 36 )
+                        begin
+                            immediate <= {8'd0, saved_inst[31:20]};
                             funct3 <= saved_inst[14:12];
                         end
                     
@@ -508,6 +563,13 @@ begin
                     begin
                         wr1 <= 0;
                         wr2 <= 0;
+                    end
+                    7'b0010011: // OP_IMM (Integer Register-Immediate Instructions) Spec. PDF-Page 36 )
+                    begin
+                        wr1 <= 1;
+                        wr2 <= 1;
+                        addr1 <= saved_inst[11:7];
+                        addr2 <= saved_inst[11:7];
                     end
                     
                 endcase
