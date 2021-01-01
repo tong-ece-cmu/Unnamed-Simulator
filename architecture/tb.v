@@ -30,6 +30,7 @@ module tb(
     reg [31:0] inst;
     reg [31:0] in_bus;
     wire [31:0] out_bus;
+    wire [31:0] mem_addr;
 //    reg [31:0] inst_memory [0:512];
     
     
@@ -62,6 +63,6 @@ module tb(
 		#50 $finish;            // Quit the simulation
 	end
 	    
-    main main_cpu_module(.clk(clk), .rst(rst), .inst(inst), .in_bus(in_bus), .out_bus(out_bus));
+    main main_cpu_module(.clk(clk), .rst(rst), .inst(inst), .in_bus(in_bus), .out_bus(out_bus), .mem_addr(mem_addr));
     
 endmodule

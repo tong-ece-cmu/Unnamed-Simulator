@@ -20,12 +20,13 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 
-module main(clk, rst, inst, in_bus, out_bus);
+module main(clk, rst, inst, in_bus, out_bus, mem_addr);
 input clk;
 input rst;
 input [31:0] inst;
 input [31:0] in_bus;
 output [31:0] out_bus;
+output [31:0] mem_addr;
 
 wire [31:0] rd_data1, rd_data2, wr_data, wr_pc, PC;
 wire [19:0] immediate;
@@ -39,7 +40,7 @@ Control control_module(.clk(clk), .rst(rst), .addr1(addr1), .addr2(addr2), .rd1(
                         .dp_ctrl(dp_ctrl), .immediate(immediate), .inst(inst), .PC(PC), .wr_pc(wr_pc), .funct3(funct3));
                         
 Datapath datapath_module(.clk(clk), .dp_ctrl(dp_ctrl), .wr_data(wr_data), .wr_pc(wr_pc), .PC(PC), .rd_data1(rd_data1), .rd_data2(rd_data2), 
-                            .immediate(immediate), .in_bus(in_bus), .out_bus(out_bus), .funct3(funct3));
+                            .immediate(immediate), .in_bus(in_bus), .out_bus(out_bus), .funct3(funct3), .mem_addr(mem_addr));
                             
 RegisterFile register_module(.clk(clk), .addr1(addr1), .addr2(addr2), .rd1(rd1), .rd2(rd2), .wr1(wr1), .wr2(wr2), .wr_data(wr_data), 
                                 .rd_data1(rd_data1), .rd_data2(rd_data2));
@@ -77,7 +78,7 @@ end
 
 endmodule
 
-module Datapath (clk, dp_ctrl, wr_data, wr_pc, PC, rd_data1, rd_data2, immediate, in_bus, out_bus, funct3);
+module Datapath (clk, dp_ctrl, wr_data, wr_pc, PC, rd_data1, rd_data2, immediate, in_bus, out_bus, funct3, mem_addr);
 input clk;
 input [6:0] dp_ctrl;
 output reg [31:0] wr_data;
@@ -89,6 +90,7 @@ input [19:0] immediate;
 input [31:0] in_bus;
 output reg [31:0] out_bus;
 input [2:0] funct3;
+output reg [31:0] mem_addr;
 
 always @ (posedge clk)
 begin
@@ -109,9 +111,7 @@ begin
 	else if (dp_ctrl == 7'b0001000)
 	    // AND_LSB
 	    wr_data <= {32{rd_data1[0]}} & rd_data2;
-	else if (dp_ctrl == 7'b0100000)
-	    // STORE
-	    out_bus <= rd_data1;
+	
 	    
 	    
 	    // -------------------------------------- RISC-V --------------------------------------
@@ -181,6 +181,8 @@ begin
 	
 	else if (dp_ctrl == 7'b0000011) // LOAD (Load to Register) Spec. PDF-Page 42 )
 	begin
+	    mem_addr <= {{20{immediate[11]}}, immediate[11:0]} + rd_data1;
+	    
 	    if (funct3 == 3'b000) // LB (Load Byte)
 	    begin
 	        wr_data <= {{24{in_bus[7]}}, in_bus[7:0]};
@@ -202,6 +204,24 @@ begin
 	        wr_data <= {16'b0, in_bus[15:0]};
 	    end
 	end
+	
+	else if (dp_ctrl == 7'b0100011) // STORE (Store to Memory) Spec. PDF-Page 42 )
+    begin
+        mem_addr <= {{20{immediate[11]}}, immediate[11:0]} + rd_data1;
+        
+        if (funct3 == 3'b000) // SB (Store Byte)
+	    begin
+	        out_bus <= {24'b0, rd_data2[7:0]};
+	    end
+	    if (funct3 == 3'b001) // SH (Store Half Word)
+	    begin
+	        out_bus <= {16'b0, rd_data2[15:0]};
+	    end
+	    if (funct3 == 3'b010) // SW (Store Word)
+	    begin
+	        out_bus <= rd_data2;
+	    end
+    end
 end
 
 endmodule
@@ -282,12 +302,7 @@ begin
                             rd2 <= 0;
 //                            next_state = s1;
                         end
-                    7'b0001001: // Store
-                        begin
-                            rd1 <= 1;
-                            rd2 <= 0;
-//                            next_state = s1;
-                        end
+                    
                     
                     // -------------------------------------- RISC-V --------------------------------------
                     
@@ -326,6 +341,13 @@ begin
                             rd2 <= 0;
                             addr1 <= inst[19:15];
                         end
+                    7'b0100011: // STORE (Store to Memory) Spec. PDF-Page 42 )
+                        begin
+                            rd1 <= 1;
+                            rd2 <= 1;
+                            addr1 <= inst[19:15];
+                            addr2 <= inst[24:20];
+                        end
                 endcase
             end
     
@@ -360,11 +382,7 @@ begin
                             dp_ctrl <= 6'b000100;
     //						next_state = s2;
                         end
-                    7'b0001001: // Store
-                        begin
-                            dp_ctrl <= 6'b100000;
-    //						next_state = s2;
-                        end
+                    
                     
                     // -------------------------------------- RISC-V --------------------------------------
                     
@@ -392,6 +410,11 @@ begin
                     7'b0000011: // LOAD (Load to Register) Spec. PDF-Page 42 )
                         begin
                             immediate <= {8'd0, saved_inst[31:20]};
+                            funct3 <= saved_inst[14:12];
+                        end
+                    7'b0100011: // STORE (Store to Memory) Spec. PDF-Page 42 )
+                        begin
+                            immediate <= {8'd0, saved_inst[31:25], saved_inst[11:7]};
                             funct3 <= saved_inst[14:12];
                         end
                     
@@ -436,11 +459,7 @@ begin
                         wr1 <= 1;
                         wr2 <= 1;
                     end
-                    7'b0001001: // Store
-                    begin
-                        wr1 <= 0;
-                        wr2 <= 0;		
-                    end
+                    
                     
                     
                     // -------------------------------------- RISC-V --------------------------------------
@@ -485,6 +504,12 @@ begin
                         addr1 <= saved_inst[11:7];
                         addr2 <= saved_inst[11:7];
                     end
+                    7'b0100011: // STORE (Store to Memory) Spec. PDF-Page 42 )
+                    begin
+                        wr1 <= 0;
+                        wr2 <= 0;
+                    end
+                    
                 endcase
                 
             end
