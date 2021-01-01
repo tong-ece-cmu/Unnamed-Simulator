@@ -99,24 +99,10 @@ begin
 	wr_data <= wr_data;
 	
 	// Choose which datapath operation based on opcode
-	if (dp_ctrl == 7'b0000001)
-		// Add
-		wr_data <= rd_data1 + rd_data2;
-	else if (dp_ctrl == 7'b0000010)
-	    // R_SHIFT
-	    wr_data <= rd_data1 >> 1;
-	else if (dp_ctrl == 7'b0000100)
-	    // L_SHIFT
-	    wr_data <= rd_data1 << 1;
-	else if (dp_ctrl == 7'b0001000)
-	    // AND_LSB
-	    wr_data <= {32{rd_data1[0]}} & rd_data2;
 	
-	    
-	    
 	    // -------------------------------------- RISC-V --------------------------------------
 	    
-	else if (dp_ctrl == 7'b0110111) // LUI (Load Upper Immediate) Spec. PDF-Page 37 )
+	if (dp_ctrl == 7'b0110111) // LUI (Load Upper Immediate) Spec. PDF-Page 37 )
 	    wr_data <= {immediate, 12'b0};
 	else if (dp_ctrl == 7'b0010111) // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
 	begin
@@ -187,19 +173,19 @@ begin
 	    begin
 	        wr_data <= {{24{in_bus[7]}}, in_bus[7:0]};
 	    end
-	    if (funct3 == 3'b001) // LH (Load Half Word)
+	    else if (funct3 == 3'b001) // LH (Load Half Word)
 	    begin
 	        wr_data <= {{16{in_bus[15]}}, in_bus[15:0]};
 	    end
-	    if (funct3 == 3'b010) // LW (Load Word)
+	    else if (funct3 == 3'b010) // LW (Load Word)
 	    begin
 	        wr_data <= in_bus;
 	    end
-	    if (funct3 == 3'b100) // LBU (Load Byte Unsigned)
+	    else if (funct3 == 3'b100) // LBU (Load Byte Unsigned)
 	    begin
 	        wr_data <= {24'b0, in_bus[7:0]};
 	    end
-	    if (funct3 == 3'b101) // LHU (Load Half Word Unsigned)
+	    else if (funct3 == 3'b101) // LHU (Load Half Word Unsigned)
 	    begin
 	        wr_data <= {16'b0, in_bus[15:0]};
 	    end
@@ -213,11 +199,11 @@ begin
 	    begin
 	        out_bus <= {24'b0, rd_data2[7:0]};
 	    end
-	    if (funct3 == 3'b001) // SH (Store Half Word)
+	    else if (funct3 == 3'b001) // SH (Store Half Word)
 	    begin
 	        out_bus <= {16'b0, rd_data2[15:0]};
 	    end
-	    if (funct3 == 3'b010) // SW (Store Word)
+	    else if (funct3 == 3'b010) // SW (Store Word)
 	    begin
 	        out_bus <= rd_data2;
 	    end
@@ -229,34 +215,33 @@ begin
 	    begin
 	       wr_data <= rd_data1 + {{20{immediate[11]}}, immediate[11:0]};
 	    end
-	    
-	    if (funct3 == 3'b010) // SLTI (Set Less Than Immediate)
+	    else if (funct3 == 3'b010) // SLTI (Set Less Than Immediate)
 	    begin
 	       wr_data <= $signed(rd_data1) < $signed({{20{immediate[11]}}, immediate[11:0]}) ? 32'b1 : 32'b0;
 	    end
-	    if (funct3 == 3'b011) // SLTIU (Set Less Than Immediate Unsigned)
+	    else if (funct3 == 3'b011) // SLTIU (Set Less Than Immediate Unsigned)
 	    begin
 	       wr_data <= rd_data1 < {{20{immediate[11]}}, immediate[11:0]} ? 32'b1 : 32'b0;
 	    end
-	    if (funct3 == 3'b100) // XORI (XOR Immediate)
+	    else if (funct3 == 3'b100) // XORI (XOR Immediate)
 	    begin
 	       wr_data <= {{20{immediate[11]}}, immediate[11:0]} ^ rd_data1;
 	    end
-	    if (funct3 == 3'b110) // ORI (OR Immediate)
+	    else if (funct3 == 3'b110) // ORI (OR Immediate)
 	    begin
 	       wr_data <= {{20{immediate[11]}}, immediate[11:0]} | rd_data1;
 	    end
-	    if (funct3 == 3'b111) // ANDI (AND Immediate)
+	    else if (funct3 == 3'b111) // ANDI (AND Immediate)
 	    begin
 	       wr_data <= {{20{immediate[11]}}, immediate[11:0]} & rd_data1;
 	    end
-	    if (funct3 == 3'b001) // SLLI (Shift Left Logic Immediate)
+	    else if (funct3 == 3'b001) // SLLI (Shift Left Logic Immediate)
 	    begin
 	       wr_data <= rd_data1 << immediate[4:0];
 	    end
-	    if (funct3 == 3'b101) 
+	    else if (funct3 == 3'b101) 
 	    begin
-	       if (immediate[30] == 0) // SRLI (Shift Right Logic Immediate)
+	       if (immediate[10] == 0) // SRLI (Shift Right Logic Immediate)
 	       begin
 	           wr_data <= rd_data1 >> immediate[4:0];
 	       end
@@ -265,6 +250,62 @@ begin
 	           wr_data <= $signed(rd_data1) >>> immediate[4:0];
 	       end
 	    end
+    end
+    
+    else if (dp_ctrl == 7'b0110011) // OP (Integer Register-Register Instructions) Spec. PDF-Page 37 )
+    begin
+        if (funct3 == 3'b000) 
+	    begin
+	       if (immediate[5] == 0) // ADD (Addition)
+	       begin
+	           wr_data <= rd_data1 + rd_data2;
+	       end
+	       else // SUB (Subtraction)
+	       begin 
+	           wr_data <= rd_data1 - rd_data2;
+	       end
+	    end
+	    
+	    
+	    else if (funct3 == 3'b001) // SLL (Shift Left Logic)
+	    begin
+	       wr_data <= rd_data1 << rd_data2[4:0];
+	    end
+	    else if (funct3 == 3'b010) // SLT (Set Less Than)
+	    begin
+	       wr_data <= $signed(rd_data1) < $signed(rd_data2) ? 32'b1 : 32'b0;
+	    end
+	    else if (funct3 == 3'b011) // SLTU (Set Less Than Unsigned)
+	    begin
+	       wr_data <= rd_data1 < rd_data2 ? 32'b1 : 32'b0;
+	    end
+	    else if (funct3 == 3'b100) // XOR (XOR)
+	    begin
+	       wr_data <= rd_data1 ^ rd_data2;
+	    end
+	    
+	    
+	    else if (funct3 == 3'b101) 
+	    begin
+	       if (immediate[5] == 0) // SRL (Shift Right Logic)
+	       begin
+	           wr_data <= rd_data1 >> rd_data2[4:0];
+	       end
+	       else // SRA (Shift Right Arithmatic)
+	       begin 
+	           wr_data <= $signed(rd_data1) >>> rd_data2[4:0];
+	       end
+	    end
+	    
+	    else if (funct3 == 3'b110) // OR (OR)
+	    begin
+	       wr_data <= rd_data1 | rd_data2;
+	    end
+	    else if (funct3 == 3'b111) // AND (AND)
+	    begin
+	       wr_data <= rd_data1 & rd_data2;
+	    end
+	    
     end
 end
 
@@ -312,41 +353,8 @@ begin
                 rd1 <= 0;
                 rd2 <= 0;
                 saved_inst <= inst; // Instruction input may not be valid in future clock cycles. So, we save the instruction in an internal register.
-//                next_state = s0;
                 state <= s1;
                 case (inst[6:0])
-                    // Set the control signals for the next phase
-                    7'b0000000: // NOP
-                        begin
-                            rd1 <= 0;
-                            rd2 <= 0;
-//                            next_state = s1;
-                        end
-                    7'b0000001: // ANDLSB
-                        begin
-                            rd1 <= 1;
-                            rd2 <= 1;
-//                            next_state = s1;
-                        end
-                    7'b0000010: // Add
-                        begin
-                            rd1 <= 1;
-                            rd2 <= 1;
-//                            next_state = s1;
-                        end
-                    7'b0000100: // Right shift
-                        begin
-                            rd1 <= 1;
-                            rd2 <= 0;
-//                            next_state = s1;
-                        end
-                    7'b0000101: // Left shift
-                        begin
-                            rd1 <= 1;
-                            rd2 <= 0;
-//                            next_state = s1;
-                        end
-                    
                     
                     // -------------------------------------- RISC-V --------------------------------------
                     
@@ -354,7 +362,6 @@ begin
                         begin
                             rd1 <= 0;
                             rd2 <= 0;
-//                            next_state = s1;
                         end
                     7'b0010111: // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
                         begin
@@ -398,6 +405,13 @@ begin
                             rd2 <= 0;
                             addr1 <= inst[19:15];
                         end
+                    7'b0110011: // OP (Integer Register-Register Instructions) Spec. PDF-Page 37 )
+                        begin
+                            rd1 <= 1;
+                            rd2 <= 1;
+                            addr1 <= inst[19:15];
+                            addr2 <= inst[24:20];
+                        end
                 endcase
             end
     
@@ -408,32 +422,7 @@ begin
                 state <= s2;
                 case (saved_inst[6:0])
                     // Set the control signals for the next phase
-                    7'b0000000: // NOP
-                        begin
-                            dp_ctrl <= 6'b000000;
-                        end
-                    7'b0000001: // ANDLSB
-                        begin
-                            dp_ctrl <= 6'b001000;
-    //						next_state = s2;
-                        end
-                    7'b0000010: // Add
-                        begin
-                            dp_ctrl <= 6'b000001;
-    //						next_state = s2;
-                        end
-                    7'b0000100: // Right shift
-                        begin
-                            dp_ctrl <= 6'b000010;
-    //						next_state = s2;
-                        end
-                    7'b0000101: // Left shift
-                        begin
-                            dp_ctrl <= 6'b000100;
-    //						next_state = s2;
-                        end
-                    
-                    
+                  
                     // -------------------------------------- RISC-V --------------------------------------
                     
                     7'b0110111: // LUI (Load Upper Immediate) Spec. PDF-Page 37 
@@ -472,6 +461,11 @@ begin
                             immediate <= {8'd0, saved_inst[31:20]};
                             funct3 <= saved_inst[14:12];
                         end
+                    7'b0110011: // OP (Integer Register-Register Instructions) Spec. PDF-Page 37 )
+                        begin
+                            immediate <= {13'd0, saved_inst[31:25]};
+                            funct3 <= saved_inst[14:12];
+                        end
                     
                 endcase
                 
@@ -488,34 +482,6 @@ begin
                 wr2 <= 0;
                 state <= s3;
                 case (saved_inst[6:0])
-                    7'b0000000: // NOP
-                    begin
-                        wr1 <= 0;
-                        wr2 <= 0;
-                    end
-                    7'b0000001: // ANDLSB
-                    begin
-                        wr1 <= 1;
-                        wr2 <= 1;
-                    end
-                    // TODO: Add cases for remaining instructions
-                    7'b0000010: // Add
-                    begin
-                        wr1 <= 1;
-                        wr2 <= 1;
-                    end
-                    7'b0000100: // Right shift
-                    begin
-                        wr1 <= 1;
-                        wr2 <= 1;
-                    end
-                    7'b0000101: // Left shift
-                    begin
-                        wr1 <= 1;
-                        wr2 <= 1;
-                    end
-                    
-                    
                     
                     // -------------------------------------- RISC-V --------------------------------------
                     
@@ -565,6 +531,13 @@ begin
                         wr2 <= 0;
                     end
                     7'b0010011: // OP_IMM (Integer Register-Immediate Instructions) Spec. PDF-Page 36 )
+                    begin
+                        wr1 <= 1;
+                        wr2 <= 1;
+                        addr1 <= saved_inst[11:7];
+                        addr2 <= saved_inst[11:7];
+                    end
+                    7'b0110011: // OP (Integer Register-Register Instructions) Spec. PDF-Page 37 )
                     begin
                         wr1 <= 1;
                         wr2 <= 1;
