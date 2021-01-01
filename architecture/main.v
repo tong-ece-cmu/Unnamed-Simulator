@@ -29,15 +29,20 @@ output [31:0] out_bus;
 
 wire [31:0] rd_data1, rd_data2, wr_data, wr_pc, PC;
 wire [19:0] immediate;
-
+wire [2:0] funct3;
 wire [6:0] dp_ctrl;
 wire [4:0] addr1, addr2;
 wire rd1, rd2, wr1, wr2;
 
 // Instantiation of the modules
-Control control_module(.clk(clk), .rst(rst), .addr1(addr1), .addr2(addr2), .rd1(rd1), .rd2(rd2), .wr1(wr1), .wr2(wr2), .dp_ctrl(dp_ctrl), .immediate(immediate), .inst(inst), .PC(PC), .wr_pc(wr_pc));
-Datapath datapath_module(.clk(clk), .dp_ctrl(dp_ctrl), .wr_data(wr_data), .wr_pc(wr_pc), .PC(PC), .rd_data1(rd_data1), .rd_data2(rd_data2), .immediate(immediate), .in_bus(in_bus), .out_bus(out_bus));
-RegisterFile register_module(.clk(clk), .addr1(addr1), .addr2(addr2), .rd1(rd1), .rd2(rd2), .wr1(wr1), .wr2(wr2), .wr_data(wr_data), .rd_data1(rd_data1), .rd_data2(rd_data2));
+Control control_module(.clk(clk), .rst(rst), .addr1(addr1), .addr2(addr2), .rd1(rd1), .rd2(rd2), .wr1(wr1), .wr2(wr2), 
+                        .dp_ctrl(dp_ctrl), .immediate(immediate), .inst(inst), .PC(PC), .wr_pc(wr_pc), .funct3(funct3));
+                        
+Datapath datapath_module(.clk(clk), .dp_ctrl(dp_ctrl), .wr_data(wr_data), .wr_pc(wr_pc), .PC(PC), .rd_data1(rd_data1), .rd_data2(rd_data2), 
+                            .immediate(immediate), .in_bus(in_bus), .out_bus(out_bus), .funct3(funct3));
+                            
+RegisterFile register_module(.clk(clk), .addr1(addr1), .addr2(addr2), .rd1(rd1), .rd2(rd2), .wr1(wr1), .wr2(wr2), .wr_data(wr_data), 
+                                .rd_data1(rd_data1), .rd_data2(rd_data2));
 
 endmodule
 
@@ -72,7 +77,7 @@ end
 
 endmodule
 
-module Datapath (clk, dp_ctrl, wr_data, wr_pc, PC, rd_data1, rd_data2, immediate, in_bus, out_bus);
+module Datapath (clk, dp_ctrl, wr_data, wr_pc, PC, rd_data1, rd_data2, immediate, in_bus, out_bus, funct3);
 input clk;
 input [6:0] dp_ctrl;
 output reg [31:0] wr_data;
@@ -83,6 +88,7 @@ input [31:0] rd_data2;
 input [19:0] immediate;
 input [31:0] in_bus;
 output reg [31:0] out_bus;
+input [2:0] funct3;
 
 always @ (posedge clk)
 begin
@@ -128,13 +134,61 @@ begin
 	else if (dp_ctrl == 7'b1100111) // JALR (Jump And Link Register) Spec. PDF-Page 39 )
 	begin
 	    wr_data <= 32'd4 + PC;
-	    wr_pc <= {{20{immediate[11]}}, immediate[11:1], 1'b0} + rd_data1;
+	    wr_pc <= {{20{immediate[11]}}, immediate[11:1], 1'b0} + rd_data1; // it needs LSB to be zero
+	end
+	
+	else if (dp_ctrl == 7'b1100011) // BRANCH (Comparasion and Branch) Spec. PDF-Page 40 )
+	begin
+	    if (funct3 == 3'b000) // BEQ (Branch Equal)
+	    begin
+	        if (rd_data1 == rd_data2)
+	        begin wr_pc <= {{19{immediate[11]}}, immediate[11:0], 1'b0} + PC; end
+	        else
+	        begin wr_pc <= PC + 32'd4; end
+	    end
+	    else if (funct3 == 3'b001) // BNE (Branch Not Equal)
+	    begin
+	        if (rd_data1 != rd_data2)
+	        begin wr_pc <= {{19{immediate[11]}}, immediate[11:0], 1'b0} + PC; end
+	        else
+	        begin wr_pc <= PC + 32'd4; end
+	    end
+	    else if (funct3 == 3'b100) // BLT (Branch Less Than)
+	    begin
+	        if ($signed(rd_data1) < $signed(rd_data2))
+	        begin wr_pc <= {{19{immediate[11]}}, immediate[11:0], 1'b0} + PC; end
+	        else
+	        begin wr_pc <= PC + 32'd4; end
+	    end
+	    else if (funct3 == 3'b101) // BGT (Branch Greater Than)
+	    begin
+	        if ($signed(rd_data1) >= $signed(rd_data2))
+	        begin wr_pc <= {{19{immediate[11]}}, immediate[11:0], 1'b0} + PC; end
+	        else
+	        begin wr_pc <= PC + 32'd4; end
+	    end
+	    else if (funct3 == 3'b110) // BLTU (Branch Less Than Unsigned)
+	    begin
+	        if (rd_data1 < rd_data2)
+	        begin wr_pc <= {{19{immediate[11]}}, immediate[11:0], 1'b0} + PC; end
+	        else
+	        begin wr_pc <= PC + 32'd4; end
+	    end
+	    else if (funct3 == 3'b111) // BGTU (Branch Greater Than Unsigned)
+	    begin
+	        if (rd_data1 >= rd_data2)
+	        begin wr_pc <= {{19{immediate[11]}}, immediate[11:0], 1'b0} + PC; end
+	        else
+	        begin wr_pc <= PC + 32'd4; end
+	    end
+	    
+	    
 	end
 end
 
 endmodule
 
-module Control (clk, rst, addr1, addr2, rd1, rd2, wr1, wr2, dp_ctrl, immediate, inst, PC, wr_pc);
+module Control (clk, rst, addr1, addr2, rd1, rd2, wr1, wr2, dp_ctrl, immediate, inst, PC, wr_pc, funct3);
 input clk;
 input rst;
 input [31:0] inst;
@@ -148,6 +202,7 @@ output reg [6:0] dp_ctrl;
 output reg [19:0] immediate;
 output reg [31:0] PC;
 input [31:0] wr_pc;
+output reg [2:0] funct3;
 
 reg [1:0] cycle;
 reg [31:0] saved_inst;
@@ -247,6 +302,13 @@ begin
                             rd2 <= 0;
                             addr1 <= inst[19:15];
                         end
+                    7'b1100011: // BRANCH (Comparasion and Branch) Spec. PDF-Page 40 )
+                        begin
+                            rd1 <= 1;
+                            rd2 <= 1;
+                            addr1 <= inst[19:15];
+                            addr2 <= inst[24:20];
+                        end
                         
                 endcase
             end
@@ -320,6 +382,11 @@ begin
                     7'b1100111: // JALR (Jump And Link Register) Spec. PDF-Page 39 )
                         begin
                             immediate <= {8'd0, saved_inst[31:20]};
+                        end
+                    7'b1100011: // BRANCH (Comparasion and Branch) Spec. PDF-Page 40 )
+                        begin
+                            immediate <= {8'b0, saved_inst[31], saved_inst[7], saved_inst[30:25], saved_inst[11:8]};
+                            funct3 <= saved_inst[14:12];
                         end
                     
                 endcase
@@ -405,6 +472,11 @@ begin
                         addr1 <= saved_inst[11:7];
                         addr2 <= saved_inst[11:7];
                     end
+                    7'b1100011: // BRANCH (Comparasion and Branch) Spec. PDF-Page 40 )
+                    begin
+                        wr1 <= 0;
+                        wr2 <= 0;
+                    end
                 endcase
                 
             end
@@ -424,6 +496,10 @@ begin
                         PC <= wr_pc;
                     end
                     7'b1100111: // JALR (Jump And Link Register) Spec. PDF-Page 39 )
+                    begin
+                        PC <= wr_pc;
+                    end
+                    7'b1100011: // BRANCH (Comparasion and Branch) Spec. PDF-Page 40 )
                     begin
                         PC <= wr_pc;
                     end
