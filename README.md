@@ -88,6 +88,28 @@ run - Run the simulation for the specified time.\
 Generate Tcl scripts to check register file content and out_bus content.\
 Generate Verilog testbench.\
 
+## C Test Program
+
+Test program canidates: a* search program, image ray tracing, chess ai, go ai, xml parsing
+
+A* in C: https://rosettacode.org/wiki/A*_search_algorithm
+
+
+## TCM - Tightly Coupled Memory
+
+It's a small memory that sits right next to CPU. It's fast and can be accessed in one clock cycle. It's different from cache as it has its own physical address space. Cache doesn't have its own address space, it just exist there to do make some memory access faster. 
+
+## Notes while doing it
+
+I think we are writing too much test. Let's just keep on going to implement new features and leave testing to the end. It should be faster that way. We will use existing C program from the web, compile them to assembly and run them. We can locate bugs by isolating code and back tracing. Segment c code into different block, after each block check all variable values. If some of them are wrong, then some insturctions in this block is causing problem.
+
+Benefit: I don't need to come up with tests for all instructions. It's possible that most of the design is correct. Save time. 
+
+Key assumption: Back tracing bug is easier than creating test cases for instructions. 
+
+I don't think unit test is going to be helpful. It's help as it remind me what new features that I still need to implement. But it's really not helpful for finding bugs or checking the design. If there are something in the component level is broken, I can just think about it and go fix it immediately, I don't need to write a unit test to find it. 
+
+I admit it's hard to debug a big complex program. But the diffcuilty is coming from poor understanding of the program and insufficient inspection tool. If in a big complex program, every line of code is well understood and every variable can be probed and checked for correctness, then there shouldn't be any diffculty.
 
 # Literature Review
 
@@ -139,11 +161,18 @@ There are RISC-V verilog implementation exist on the web, but they doesn't seem 
 
 We will use Verilog to create an architecture that use the RISC-V ISA. Then use SystemC to create a software model for it. Then run some real software on it to gauge the performance of the architecture.
 
-I think we are writing too much test. Let's just keep on going to implement new features and leave testing to the end. It should be faster that way. We will use existing C program from the web, compile them to assembly and run them. We can locate bugs by isolating code and back tracing. Segment c code into different block, after each block check all variable values. If some of them are wrong, then some insturctions in this block is causing problem.
 
-Benefit: I don't need to come up with tests for all instructions. It's possible that most of the design is correct. Save time. 
+## System Call
 
-Key assumption: Back tracing bug is easier than creating test cases for instructions. 
+Read it here: http://osblog.stephenmarz.com/ch7.html#:~:text=In%20the%20RISC-V%20architecture%2C%20we%20invoke%20the%20call,all%20traps%20are%20handled%2C%20including%20our%20system%20calls.
+
+Used for letting unprivilaged code requesting privilaged OS service.
+
+## Memory Barrier
+
+Read it here: https://en.wikipedia.org/wiki/Memory_barrier
+
+Used for multi-core synchronization. There is a fence instruction in RISC-V ISA.
 
 ## RISC-V Compiler Tool Chain
 
