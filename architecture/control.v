@@ -19,7 +19,31 @@
 // 
 //////////////////////////////////////////////////////////////////////////////////
 
-module Control (clk, rst, addr1, addr2, rd1, rd2, wr1, wr2, dp_ctrl, immediate, inst, PC, wr_pc, funct3);
+module ProgramCounter(clk, rst, wr_pc_valid, wr_pc, PC);
+input clk;
+input rst;
+input wr_pc_valid;
+input [31:0] wr_pc;
+output reg [31:0] PC;
+
+wire next_pc = PC + 32'd4;
+
+always @ (posedge clk)
+begin
+    if (wr_pc_valid) begin
+        PC <= wr_pc;
+    end
+    else begin
+        PC <= next_pc;
+    end
+end
+
+
+endmodule
+
+
+
+module Control (clk, rst, addr1, addr2, rd1, rd2, wr1, wr2, dp_ctrl, immediate, inst, PC, wr_pc, wr_pc_valid, funct3);
 input clk;
 input rst;
 input [31:0] inst;
@@ -31,11 +55,12 @@ output reg wr1;
 output reg wr2;
 output reg [6:0] dp_ctrl;
 output reg [19:0] immediate;
-output reg [31:0] PC;
+output reg wr_pc_valid;
+input [31:0] PC;
 input [31:0] wr_pc;
 output reg [2:0] funct3;
 
-reg [31:0] saved_inst;
+reg [31:0] saved_inst, saved_pc;
 reg [2:0] state, next_state;
 parameter [2:0]s0=3'b000,s1=3'b001,s2=3'b010,s3=3'b011,s4=3'b100;
 
@@ -43,23 +68,22 @@ parameter [2:0]s0=3'b000,s1=3'b001,s2=3'b010,s3=3'b011,s4=3'b100;
 always @ (posedge clk)
 begin
     if(rst) begin
-        PC <= 32'b0;
         state <= s0;
     end
     else begin
        
         case (state)
     
-        s0:	// Cycle 1 -- Decode / Start Reading Register File at Rising Clock edge
+        s0:	    // Cycle 1 -- Decode / Start Reading Register File at Rising Clock edge
             begin
                 dp_ctrl <= 0;
                 wr1 <= 0;
                 wr2 <= 0;
                 addr1 <= inst[7:4];
                 addr2 <= inst[3:0];
-                rd1 <= 0;
-                rd2 <= 0;
-                saved_inst <= inst; // Instruction input may not be valid in future clock cycles. So, we save the instruction in an internal register.
+                wr_pc_valid <= 1'b0;
+                saved_pc <= PC;
+                saved_inst <= inst; // Instruction input valid in future clock cycles due to pipeline. So, we save the instruction in an internal register.
                 state <= s1;
                 case (inst[6:0])
                     
@@ -118,6 +142,11 @@ begin
                             rd2 <= 1;
                             addr1 <= inst[19:15];
                             addr2 <= inst[24:20];
+                        end
+                    default:
+                        begin
+                            rd1 <= 0;
+                            rd2 <= 0;
                         end
                 endcase
             end
@@ -277,19 +306,19 @@ begin
                     
                     7'b1101111: // JAL (Jump And Link) Spec. PDF-Page 39 )
                     begin
-                        PC <= wr_pc;
+                        wr_pc_valid <= 1'b1;
                     end
                     7'b1100111: // JALR (Jump And Link Register) Spec. PDF-Page 39 )
                     begin
-                        PC <= wr_pc;
+                        wr_pc_valid <= 1'b1;
                     end
                     7'b1100011: // BRANCH (Comparasion and Branch) Spec. PDF-Page 40 )
                     begin
-                        PC <= wr_pc;
+                        wr_pc_valid <= 1'b1;
                     end
                     default:
                     begin
-                        PC <= PC + 32'd4;
+                        wr_pc_valid <= 1'b0;
                     end
                 endcase
             end

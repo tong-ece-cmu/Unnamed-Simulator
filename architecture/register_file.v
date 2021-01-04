@@ -19,10 +19,11 @@
 // 
 //////////////////////////////////////////////////////////////////////////////////
 
-module RegisterFile (clk, addr1, addr2, rd1, rd2, wr1, wr2, wr_data, rd_data1, rd_data2);
+module RegisterFile (clk, addr1, addr2, addr3, rd1, rd2, wr1, wr2, wr_data, rd_data1, rd_data2);
 input clk;
 input [4:0] addr1;
 input [4:0] addr2;
+input [4:0] addr3;
 input rd1;
 input rd2;
 input wr1;
@@ -37,15 +38,14 @@ always @ (posedge clk)
 begin
 	if (wr1 && wr2)
 		// Write
-		registers[addr1] <= wr_data;
-	else
-	begin
-		// Read
-		if (rd1)
-			rd_data1 <= registers[addr1];
-		if (rd2)
-			rd_data2 <= registers[addr2];
-	end
+		registers[addr3] <= wr_data;
+	
+    // Read
+    if (rd1)
+        rd_data1 <= registers[addr1];
+    if (rd2)
+        rd_data2 <= registers[addr2];
+	
 end
 
 endmodule
