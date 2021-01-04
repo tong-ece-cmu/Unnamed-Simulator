@@ -50,6 +50,19 @@ end
 
 endmodule
 
+
+module InstructionMemory(clk, PC, inst);
+input clk;
+input [31:0] PC;
+output inst;
+
+reg [7:0] imem [255:0];
+
+assign inst = {imem[PC+3], imem[PC+2], imem[PC+1], imem[PC]};
+
+endmodule
+
+
 // Little Endian Memory, LSB is in the smaller address in memory
 module Memory (clk, dp_ctrl, funct3, addr, mem_wr_data, mem_rd_data);
 input clk;
