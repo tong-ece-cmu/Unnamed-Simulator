@@ -47,6 +47,69 @@ assign rd_data2 =   forward_ctrl2 == 2'b00 ? rd_data2_input :
                     forward_ctrl2 == 2'b01 ? wr_data :
                     forward_ctrl2 == 2'b10 ? mem_forward : wr_data;
 
+wire [19:0] shifttt = {immediate[11:0], 1'b0};
+always @ (*)
+begin
+
+if (dp_ctrl == 7'b1101111) // JAL (Jump And Link) Spec. PDF-Page 39 )
+begin
+    wr_pc <= {{11{immediate[19]}}, immediate, 1'b0} + PC;
+end
+else if (dp_ctrl == 7'b1100111) // JALR (Jump And Link Register) Spec. PDF-Page 39 )
+begin
+    wr_pc <= {{20{immediate[11]}}, immediate[11:1], 1'b0} + rd_data1; // it needs LSB to be zero
+end
+
+else if (dp_ctrl == 7'b1100011) // BRANCH (Comparasion and Branch) Spec. PDF-Page 40 )
+begin
+    if (funct3 == 3'b000) // BEQ (Branch Equal)
+    begin
+        if (rd_data1 == rd_data2)
+        begin wr_pc <= {{19{immediate[11]}}, immediate[11:0], 1'b0} + PC; end
+        else
+        begin 
+           wr_pc <= PC + 32'd4; 
+        end
+    end
+    else if (funct3 == 3'b001) // BNE (Branch Not Equal)
+    begin
+        if (rd_data1 != rd_data2)
+        begin wr_pc <= {{19{immediate[11]}}, immediate[11:0], 1'b0} + PC; end
+        else
+        begin wr_pc <= PC + 32'd4; end
+    end
+    else if (funct3 == 3'b100) // BLT (Branch Less Than)
+    begin
+        if ($signed(rd_data1) < $signed(rd_data2))
+        begin wr_pc <= {{19{immediate[11]}}, immediate[11:0], 1'b0} + PC; end
+        else
+        begin wr_pc <= PC + 32'd4; end
+    end
+    else if (funct3 == 3'b101) // BGT (Branch Greater Than)
+    begin
+        if ($signed(rd_data1) >= $signed(rd_data2))
+        begin wr_pc <= {{19{immediate[11]}}, immediate[11:0], 1'b0} + PC; end
+        else
+        begin wr_pc <= PC + 32'd4; end
+    end
+    else if (funct3 == 3'b110) // BLTU (Branch Less Than Unsigned)
+    begin
+        if (rd_data1 < rd_data2)
+        begin wr_pc <= {{19{immediate[11]}}, immediate[11:0], 1'b0} + PC; end
+        else
+        begin wr_pc <= PC + 32'd4; end
+    end
+    else if (funct3 == 3'b111) // BGTU (Branch Greater Than Unsigned)
+    begin
+        if (rd_data1 >= rd_data2)
+        begin wr_pc <= {{19{immediate[11]}}, immediate[11:0], 1'b0} + PC; end
+        else
+        begin wr_pc <= PC + 32'd4; end
+    end
+end
+
+end
+
 
 always @ (posedge clk)
 begin
@@ -64,60 +127,62 @@ begin
 	end
 	else if (dp_ctrl == 7'b1101111) // JAL (Jump And Link) Spec. PDF-Page 39 )
 	begin
-	    wr_data <= 32'd4 + PC;
-	    wr_pc <= {{11{immediate[19]}}, immediate, 1'b0} + PC;
+	    wr_data <= PC + 32'd4;
+//	    wr_pc <= {{11{immediate[19]}}, immediate, 1'b0} + PC;
 	end
 	else if (dp_ctrl == 7'b1100111) // JALR (Jump And Link Register) Spec. PDF-Page 39 )
 	begin
-	    wr_data <= 32'd4 + PC;
-	    wr_pc <= {{20{immediate[11]}}, immediate[11:1], 1'b0} + rd_data1; // it needs LSB to be zero
+	    wr_data <= PC + 32'd4;
+//	    wr_pc <= {{20{immediate[11]}}, immediate[11:1], 1'b0} + rd_data1; // it needs LSB to be zero
 	end
 	
-	else if (dp_ctrl == 7'b1100011) // BRANCH (Comparasion and Branch) Spec. PDF-Page 40 )
-	begin
-	    if (funct3 == 3'b000) // BEQ (Branch Equal)
-	    begin
-	        if (rd_data1 == rd_data2)
-	        begin wr_pc <= {{19{immediate[11]}}, immediate[11:0], 1'b0} + PC; end
-	        else
-	        begin wr_pc <= PC + 32'd4; end
-	    end
-	    else if (funct3 == 3'b001) // BNE (Branch Not Equal)
-	    begin
-	        if (rd_data1 != rd_data2)
-	        begin wr_pc <= {{19{immediate[11]}}, immediate[11:0], 1'b0} + PC; end
-	        else
-	        begin wr_pc <= PC + 32'd4; end
-	    end
-	    else if (funct3 == 3'b100) // BLT (Branch Less Than)
-	    begin
-	        if ($signed(rd_data1) < $signed(rd_data2))
-	        begin wr_pc <= {{19{immediate[11]}}, immediate[11:0], 1'b0} + PC; end
-	        else
-	        begin wr_pc <= PC + 32'd4; end
-	    end
-	    else if (funct3 == 3'b101) // BGT (Branch Greater Than)
-	    begin
-	        if ($signed(rd_data1) >= $signed(rd_data2))
-	        begin wr_pc <= {{19{immediate[11]}}, immediate[11:0], 1'b0} + PC; end
-	        else
-	        begin wr_pc <= PC + 32'd4; end
-	    end
-	    else if (funct3 == 3'b110) // BLTU (Branch Less Than Unsigned)
-	    begin
-	        if (rd_data1 < rd_data2)
-	        begin wr_pc <= {{19{immediate[11]}}, immediate[11:0], 1'b0} + PC; end
-	        else
-	        begin wr_pc <= PC + 32'd4; end
-	    end
-	    else if (funct3 == 3'b111) // BGTU (Branch Greater Than Unsigned)
-	    begin
-	        if (rd_data1 >= rd_data2)
-	        begin wr_pc <= {{19{immediate[11]}}, immediate[11:0], 1'b0} + PC; end
-	        else
-	        begin wr_pc <= PC + 32'd4; end
-	    end
-	end
+//	else if (dp_ctrl == 7'b1100011) // BRANCH (Comparasion and Branch) Spec. PDF-Page 40 )
+//	begin
+//	    if (funct3 == 3'b000) // BEQ (Branch Equal)
+//	    begin
+//	        if (rd_data1 == rd_data2)
+//	        begin wr_pc <= {{19{immediate[11]}}, immediate[11:0], 1'b0} + PC; end
+//	        else
+//	        begin 
+//	           wr_pc <= PC + 32'd4; 
+//	        end
+//	    end
+//	    else if (funct3 == 3'b001) // BNE (Branch Not Equal)
+//	    begin
+//	        if (rd_data1 != rd_data2)
+//	        begin wr_pc <= {{19{immediate[11]}}, immediate[11:0], 1'b0} + PC; end
+//	        else
+//	        begin wr_pc <= PC + 32'd4; end
+//	    end
+//	    else if (funct3 == 3'b100) // BLT (Branch Less Than)
+//	    begin
+//	        if ($signed(rd_data1) < $signed(rd_data2))
+//	        begin wr_pc <= {{19{immediate[11]}}, immediate[11:0], 1'b0} + PC; end
+//	        else
+//	        begin wr_pc <= PC + 32'd4; end
+//	    end
+//	    else if (funct3 == 3'b101) // BGT (Branch Greater Than)
+//	    begin
+//	        if ($signed(rd_data1) >= $signed(rd_data2))
+//	        begin wr_pc <= {{19{immediate[11]}}, immediate[11:0], 1'b0} + PC; end
+//	        else
+//	        begin wr_pc <= PC + 32'd4; end
+//	    end
+//	    else if (funct3 == 3'b110) // BLTU (Branch Less Than Unsigned)
+//	    begin
+//	        if (rd_data1 < rd_data2)
+//	        begin wr_pc <= {{19{immediate[11]}}, immediate[11:0], 1'b0} + PC; end
+//	        else
+//	        begin wr_pc <= PC + 32'd4; end
+//	    end
+//	    else if (funct3 == 3'b111) // BGTU (Branch Greater Than Unsigned)
+//	    begin
+//	        if (rd_data1 >= rd_data2)
+//	        begin wr_pc <= {{19{immediate[11]}}, immediate[11:0], 1'b0} + PC; end
+//	        else
+//	        begin wr_pc <= PC + 32'd4; end
+//	    end
+//	end
 	
 	else if (dp_ctrl == 7'b0000011) // LOAD (Load to Register) Spec. PDF-Page 42 )
 	begin

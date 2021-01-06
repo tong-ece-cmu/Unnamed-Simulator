@@ -1,25 +1,25 @@
 # Pipeline Structure Analysis
 
 
-    rise    instruction going in IF, counter is zero, goes to one when meet PC modifying instructions
+    rise    instruction going in IF, counter is zero, goes to 2 when meet PC modifying instructions
     fall    
 
-    rise    instruction going in ID, counter == 1, Setup read address and rd siganl
+    rise    instruction going in ID, counter == 2, Setup read address and rd siganl
     fall    
 
-    rise    instruction going in EXE, register file start read, counter == 2, saved instruction 2
+    rise    instruction going in EXE, register file start read, counter == 3, saved instruction 2
     fall
 
-    rise    instruction going in MEM, datapath start execute, counter == 3, saved instruction 3
+    rise    instruction going in MEM, datapath start execute, counter == 4, saved instruction 3
     fall
 
-    rise    instruction going in WB, instruction MEM start working, exe result going in register, counter == 4, saved instruction 4
+    rise    instruction going in WB, instruction MEM start working, exe result going in register, counter == 5, saved instruction 4
     fall
 
-    rise    instruction get discarded, instruction MEM result going in register, WB start working, counter == 5
+    rise    instruction get discarded, instruction MEM result going in register, WB start working, counter == 6
     fall
 
-    rise    instruction get discarded, WB finished, counter == 6
+    rise    instruction get discarded, WB finished, counter == 7
     fall
 
 

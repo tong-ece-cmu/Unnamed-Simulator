@@ -6,11 +6,12 @@ Created on Wed Jan  6 09:43:45 2021
 """
 
 
-asem = '''ADDI x2, x0, 1
+asem = '''ADDI x1, x0, 1
 BEQ x1, x1, 12
 ADDI x1, x1, 2
 JAL x0, 8
 ADDI x1, x1, 4
+ADDI x1, x1, 1
 NOP'''
 
 # for each line

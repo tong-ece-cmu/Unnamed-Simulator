@@ -20,7 +20,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 
-module Control (clk, rst, addr1, addr2, addr3, rd1, rd2, wr1, wr2, dp_ctrl, immediate, funct3, mem_ctrl, mem_funct3, inst, PC, wr_pc, forward_ctrl1, forward_ctrl2);
+module Control (clk, rst, addr1, addr2, addr3, rd1, rd2, wr1, wr2, dp_ctrl, immediate, funct3, mem_ctrl, mem_funct3, inst, PC, dp_pc, wr_pc, forward_ctrl1, forward_ctrl2);
 input clk;
 input rst;
 input [31:0] inst;
@@ -33,7 +33,7 @@ output reg wr1;
 output reg wr2;
 output reg [6:0] dp_ctrl;
 output reg [19:0] immediate;
-output reg [31:0] PC;
+output reg [31:0] PC, dp_pc;
 input [31:0] wr_pc;
 output reg [2:0] funct3;
 output reg [6:0] mem_ctrl;
@@ -185,15 +185,29 @@ wire not_normal =(  (saved_inst[0][6:0] == 7'b1101111) // JAL (Jump And Link) Sp
 wire is_normal = ~not_normal;
 
 assign next_counter =   rst ? (3'b000) :
-                        (counter == 3'b000) ? (~load_stall ? 3'b000 : counter + 3'b001) : 
-                        (counter == 3'b001) ? (3'b0) : (3'b0);
+                        (counter == 3'b000) ? (load_stall ? counter + 3'b001 : (is_normal ? 3'b000 : 3'b010)) : 
+                        (counter == 3'b001) ? 3'b000 : 
+                        (counter == 3'b010) ? (counter + 3'b001) :
+                        (counter == 3'b011) ? (counter + 3'b001) :
+                        (counter == 3'b100) ? (counter + 3'b001) :
+                        (counter == 3'b101) ? (counter + 3'b001) :
+                        (counter == 3'b110) ? (3'b000) : (3'b000);
 
 assign next_pc =    rst ? (32'b0) : 
                     (next_counter == 3'b000) ? (PC + 32'd4) :
-                    (next_counter == 3'b001) ? PC : (PC + 32'd4);
+                    (next_counter == 3'b001) ? PC : 
+                    (next_counter == 3'b010) ? PC :
+                    (next_counter == 3'b011) ? PC :
+                    (next_counter == 3'b100) ? PC :
+                    (next_counter == 3'b101) ? wr_pc : (PC + 32'd4);
                     
 assign next_inst =  (next_counter == 3'b000) ? inst :
-                    (next_counter == 3'b001) ? NOP : inst;
+                    (next_counter == 3'b001) ? NOP : 
+                    (next_counter == 3'b010) ? NOP : 
+                    (next_counter == 3'b011) ? NOP : 
+                    (next_counter == 3'b100) ? NOP : 
+                    (next_counter == 3'b101) ? NOP : // wait longer than PC, Instruction fetch takes a while
+                    (next_counter == 3'b110) ? inst : inst; 
 
 
 //assign next_counter =   rst ? (3'b000) : 
@@ -318,7 +332,7 @@ begin
     dp_ctrl <= next_dp_ctrl;
     immediate <= next_immediate;
     funct3 <= next_funct3;
-    
+    dp_pc <= saved_pc[2];
 end
 
 
