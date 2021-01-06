@@ -58,3 +58,23 @@ imm[11:0] rs1 000 rd 0010011 ADDI
 
 imm[12|10:5] rs2 rs1 000 imm[4:1|11] 1100011 BEQ
 0000 000 00000 00000 000 01000 1100011
+
+
+
+BEQ x0, x1, 12
+LI x1, 2
+JAL 8
+LI x1, 4
+NOP
+
+
+
+AMD VEGA ISA pdf
+https://developer.amd.com/wp-content/resources/Vega_Shader_ISA.pdf
+
+
+This is where I found it: https://gpuopen.com/documentation/amd-isa-documentation/
+
+About wavefront
+https://en.wikipedia.org/wiki/Graphics_Core_Next
+
