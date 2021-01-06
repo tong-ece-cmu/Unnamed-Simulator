@@ -20,25 +20,37 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 
-module Datapath (clk, dp_ctrl, wr_data, wr_pc, PC, rd_data1, rd_data2, immediate, in_bus, out_bus, funct3, mem_addr);
+module Datapath (clk, dp_ctrl, wr_data, wr_pc, PC, rd_data1_input, rd_data2_input, forward_ctrl1, forward_ctrl2, mem_forward, immediate, funct3, mem_addr);
 input clk;
 input [6:0] dp_ctrl;
 output reg [31:0] wr_data;
 output reg [31:0] wr_pc;
 input [31:0] PC;
-input [31:0] rd_data1;
-input [31:0] rd_data2;
+
+input [1:0] forward_ctrl1;
+input [1:0] forward_ctrl2;
+input [31:0] rd_data1_input;
+input [31:0] rd_data2_input;
+input [31:0] mem_forward;
+wire [31:0] rd_data1;
+wire [31:0] rd_data2;
+
 input [19:0] immediate;
-input [31:0] in_bus;
-output reg [31:0] out_bus;
 input [2:0] funct3;
 output reg [31:0] mem_addr;
 
+assign rd_data1 =   forward_ctrl1 == 2'b00 ? rd_data1_input : 
+                    forward_ctrl1 == 2'b01 ? wr_data :
+                    forward_ctrl1 == 2'b10 ? mem_forward : wr_data;
+                    
+assign rd_data2 =   forward_ctrl2 == 2'b00 ? rd_data2_input : 
+                    forward_ctrl2 == 2'b01 ? wr_data :
+                    forward_ctrl2 == 2'b10 ? mem_forward : wr_data;
+
+
 always @ (posedge clk)
 begin
-	// Default assignments for more efficient synthesis
-	out_bus <= out_bus;
-	wr_data <= wr_data;
+
 	
 	// Choose which datapath operation based on opcode
 	
@@ -136,6 +148,7 @@ begin
 	else if (dp_ctrl == 7'b0100011) // STORE (Store to Memory) Spec. PDF-Page 42 )
     begin
         mem_addr <= {{20{immediate[11]}}, immediate[11:0]} + rd_data1;
+        wr_data <= rd_data2;
         
 //        if (funct3 == 3'b000) // SB (Store Byte)
 //	    begin

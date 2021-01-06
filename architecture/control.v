@@ -19,31 +19,8 @@
 // 
 //////////////////////////////////////////////////////////////////////////////////
 
-module ProgramCounter(clk, rst, wr_pc_valid, wr_pc, PC);
-input clk;
-input rst;
-input wr_pc_valid;
-input [31:0] wr_pc;
-output reg [31:0] PC;
 
-wire next_pc = PC + 32'd4;
-
-always @ (posedge clk)
-begin
-    if (wr_pc_valid) begin
-        PC <= wr_pc;
-    end
-    else begin
-        PC <= next_pc;
-    end
-end
-
-
-endmodule
-
-
-
-module Control (clk, rst, addr1, addr2, addr3, rd1, rd2, wr1, wr2, dp_ctrl, immediate, funct3, mem_ctrl, mem_funct3, inst, PC, wr_pc);
+module Control (clk, rst, addr1, addr2, addr3, rd1, rd2, wr1, wr2, dp_ctrl, immediate, funct3, mem_ctrl, mem_funct3, inst, PC, wr_pc, forward_ctrl1, forward_ctrl2);
 input clk;
 input rst;
 input [31:0] inst;
@@ -62,10 +39,14 @@ output reg [2:0] funct3;
 output reg [6:0] mem_ctrl;
 output reg [2:0] mem_funct3;
 
-parameter [31:0] NOP = 32'b0;
+output reg [1:0] forward_ctrl1, forward_ctrl2;
+
+wire [1:0] forward_ctrl1_next, forward_ctrl2_next;
+
+parameter [31:0] NOP = 32'h00000013; // ADDI x0, x0, 0
 reg [31:0] saved_inst[4:0], saved_pc[4:0];
-wire next_saved_inst0, next_saved_inst1, next_saved_inst2, next_saved_inst3, next_saved_inst4;
-wire next_saved_pc0, next_saved_pc1, next_saved_pc2, next_saved_pc3, next_saved_pc4;
+wire [31:0] next_saved_inst0, next_saved_inst1, next_saved_inst2, next_saved_inst3, next_saved_inst4;
+wire [31:0] next_saved_pc0, next_saved_pc1, next_saved_pc2, next_saved_pc3, next_saved_pc4;
 
 wire [31:0] next_inst;
 /*
@@ -95,8 +76,6 @@ assign next_saved_pc2 = rst ? 32'b0 : saved_pc[1];
 assign next_saved_pc3 = rst ? 32'b0 : saved_pc[2];
 assign next_saved_pc4 = rst ? 32'b0 : saved_pc[3];
 
-reg [2:0] state, next_state;
-parameter [2:0]s0=3'b000,s1=3'b001,s2=3'b010,s3=3'b011,s4=3'b100;
 
 
 always @ (posedge clk)
@@ -116,49 +95,38 @@ begin
 
 end
 
+/*
+
+if in one insturction rs1 or rs2 uses rd in another instuction
+    insert stall
+
+*/
+always @(posedge clk)
+begin
+
+    forward_ctrl1 <= forward_ctrl1_next;
+    forward_ctrl2 <= forward_ctrl2_next;
+
+end
+
+wire raw_1step = saved_inst[2][19:15] != 5'b0 && saved_inst[2][19:15] == saved_inst[3][11:7];
+wire raw_2step = saved_inst[2][19:15] != 5'b0 && saved_inst[2][19:15] == saved_inst[4][11:7];
+assign forward_ctrl1_next = rst ? 2'b00 : 
+                            raw_1step ? 2'b01 : 
+                            raw_2step ? 2'b10 : 2'b00;
 
 
+wire raw_1step_rs2 = saved_inst[2][24:20] != 5'b0 && saved_inst[2][24:20] == saved_inst[3][11:7];
+wire raw_2step_rs2 = saved_inst[2][24:20] != 5'b0 && saved_inst[2][24:20] == saved_inst[4][11:7];
+assign forward_ctrl2_next = rst ? 2'b00 : 
+                            raw_1step_rs2 ? 2'b01 : 
+                            raw_2step_rs2 ? 2'b10 : 2'b00;
 // ############################## Stage 0 -- Instruction Fetch  ##############################
 // Start setting up pc signal for instruction memory start at the Rising Clock edge
-// At the next Rising edge, this will finish decoding, and instruction memory start reading
-reg [2:0] counter;
-wire [2:0] next_counter;
-wire [31:0] next_pc;
-
-wire not_normal =(  (saved_inst[0][6:0] == 7'b1101111) // JAL (Jump And Link) Spec. PDF-Page 39 )
-                ||  (saved_inst[0][6:0] == 7'b1100111) // JALR (Jump And Link Register) Spec. PDF-Page 39 )
-                ||  (saved_inst[0][6:0] == 7'b1100011) // BRANCH (Comparasion and Branch) Spec. PDF-Page 40 )
-                );
-                
-wire is_normal = ~not_normal;
-
-assign next_counter =   rst ? (3'b000) : 
-                        (counter == 3'b000) ? (is_normal ? 3'b000 : counter + 3'b001) : 
-                        (counter == 3'b001) ? (counter + 3'b001) : 
-                        (counter == 3'b010) ? (counter + 3'b001) : 
-                        (counter == 3'b011) ? (counter + 3'b001) : 
-                        (counter == 3'b100) ? (counter + 3'b001) : 
-                        (counter == 3'b101) ? (3'b0) : (3'b0);
-                        
-assign next_pc =    (next_counter == 3'b000) ? (PC + 32'd4) :
-                    (next_counter == 3'b001) ? PC :
-                    (next_counter == 3'b010) ? PC :
-                    (next_counter == 3'b011) ? PC : 
-                    (next_counter == 3'b100) ? wr_pc :
-                    (PC + 32'd4);
-
-
-
-assign next_inst =    (next_counter == 3'b000) ? inst :
-                    (next_counter == 3'b001) ? NOP :
-                    (next_counter == 3'b010) ? NOP :
-                    (next_counter == 3'b011) ? NOP : 
-                    (next_counter == 3'b100) ? NOP :
-                    (next_counter == 3'b101) ? inst :
-                    inst;
-
+// At the next Rising edge, normally this will finish decoding, and instruction memory start reading
+// If there is a PC modifier, like branch, the FSM will start and stall the pipeline by inserting NOP. 
 /*
-rise    instruction going in IF, counter is zero
+rise    instruction going in IF, counter is zero, goes to one when meet PC modifying instructions
 fall    
 
 rise    instruction going in ID, counter == 1
@@ -170,55 +138,98 @@ fall
 rise    instruction going in MEM, datapath start execute, counter == 3
 fall
 
-rise    instruction going in WB, MEM start working, exe result going in register, counter == 4
+rise    instruction going in WB, instruction MEM start working, exe result going in register, counter == 4
 fall
 
-rise    instruction get discarded, MEM result going in register, WB start working, counter == 5
+rise    instruction get discarded, instruction MEM result going in register, WB start working, counter == 5
 fall
 
 */
+reg [2:0] counter;
+wire [2:0] next_counter;
+wire [31:0] next_pc;
 
-/*
-two choices - normal instruction / pc modifier instruction
-if normal
-    go +=4
-else -- the pc modifiers
-    wait 3-4 cycle
-    stop imcrement pc
-    insert nop in the instruction chain
 
-wire is_normal: ~(JAL && JALR && BRANCH)
+wire need_rs1 =     //                  7'b0110111 // LUI (Load Upper Immediate) Spec. PDF-Page 37 
+                    //                  7'b0010111 // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
+                    //                  7'b1101111 // JAL (Jump And Link) Spec. PDF-Page 39 )
+                    (inst[6:0] ==  7'b1100111)  // JALR (Jump And Link Register) Spec. PDF-Page 39 
+                ||  (inst[6:0] ==  7'b1100011)  // BRANCH (Comparasion and Branch) Spec. PDF-Page 40 )
+                ||  (inst[6:0] ==  7'b0000011)  // LOAD (Load to Register) Spec. PDF-Page 42 )
+                ||  (inst[6:0] ==  7'b0100011)  // STORE (Store to Memory) Spec. PDF-Page 42 )
+                ||  (inst[6:0] ==  7'b0010011)  // OP_IMM (Integer Register-Immediate Instructions) Spec. PDF-Page 36 )
+                ||  (inst[6:0] ==  7'b0110011)  // OP (Integer Register-Register Instructions) Spec. PDF-Page 37 )
+                ;
 
-reg first;
-wire next_first = is_normal; // if current instuction is normal, next one will be first modifier
-// if it's not normal, start the counter
-wire next_counter = (~is_normal) && first ? 0 : counter + 1;
+wire need_rs2 =     //                  7'b0110111 // LUI (Load Upper Immediate) Spec. PDF-Page 37 
+                    //                  7'b0010111 // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
+                    //                  7'b1101111 // JAL (Jump And Link) Spec. PDF-Page 39 )
+                    //                  7'b1100111 // JALR (Jump And Link Register) Spec. PDF-Page 39 
+                    (inst[6:0] ==  7'b1100011) // BRANCH (Comparasion and Branch) Spec. PDF-Page 40 )
+                    //                  7'b0000011 // LOAD (Load to Register) Spec. PDF-Page 42 )
+                ||  (inst[6:0] ==  7'b0100011) // STORE (Store to Memory) Spec. PDF-Page 42 )
+                    //                  7'b0010011 // OP_IMM (Integer Register-Immediate Instructions) Spec. PDF-Page 36 )
+                ||  (inst[6:0] ==  7'b0110011) // OP (Integer Register-Register Instructions) Spec. PDF-Page 37 )
+                ;
 
-state 0
-    if normal
-        pc += 4
-        instruction = next
-        go to state 0
-    else 
-        pc = pc
-        instruction = nop
-        go to state 1
+wire rs1_rd_same = need_rs1 && inst[19:15] == saved_inst[0][11:7];
+wire rs2_rd_same = need_rs2 && inst[24:20] == saved_inst[0][11:7];
+wire load_stall = (rs1_rd_same || rs2_rd_same) && (saved_inst[0][6:0] ==  7'b0000011); // LOAD (Load to Register) Spec. PDF-Page 42 )
 
-state 1
-    go to state 2
-    instruction = nop
-    pc = pc
-state 2
-    pc = wr+pc
-    
-*/
+
+wire not_normal =(  (saved_inst[0][6:0] == 7'b1101111) // JAL (Jump And Link) Spec. PDF-Page 39 )
+                ||  (saved_inst[0][6:0] == 7'b1100111) // JALR (Jump And Link Register) Spec. PDF-Page 39 )
+                ||  (saved_inst[0][6:0] == 7'b1100011) // BRANCH (Comparasion and Branch) Spec. PDF-Page 40 )
+                );
+                
+wire is_normal = ~not_normal;
+
+assign next_counter =   rst ? (3'b000) :
+                        (counter == 3'b000) ? (~load_stall ? 3'b000 : counter + 3'b001) : 
+                        (counter == 3'b001) ? (3'b0) : (3'b0);
+
+assign next_pc =    rst ? (32'b0) : 
+                    (next_counter == 3'b000) ? (PC + 32'd4) :
+                    (next_counter == 3'b001) ? PC : (PC + 32'd4);
+                    
+assign next_inst =  (next_counter == 3'b000) ? inst :
+                    (next_counter == 3'b001) ? NOP : inst;
+
+
+//assign next_counter =   rst ? (3'b000) : 
+//                        (counter == 3'b000) ? (is_normal ? 3'b000 : counter + 3'b001) : 
+//                        (counter == 3'b001) ? (counter + 3'b001) : 
+//                        (counter == 3'b010) ? (counter + 3'b001) : 
+//                        (counter == 3'b011) ? (counter + 3'b001) : 
+//                        (counter == 3'b100) ? (counter + 3'b001) : 
+//                        (counter == 3'b101) ? (3'b0) : (3'b0);
+                        
+//assign next_pc =    rst ? (32'b0) : 
+//                    (next_counter == 3'b000) ? (PC + 32'd4) :
+//                    (next_counter == 3'b001) ? PC :
+//                    (next_counter == 3'b010) ? PC :
+//                    (next_counter == 3'b011) ? PC : 
+//                    (next_counter == 3'b100) ? wr_pc :
+//                    (PC + 32'd4);
+
+
+
+//assign next_inst =  (next_counter == 3'b000) ? inst :
+//                    (next_counter == 3'b001) ? NOP :
+//                    (next_counter == 3'b010) ? NOP :
+//                    (next_counter == 3'b011) ? NOP : 
+//                    (next_counter == 3'b100) ? NOP :
+//                    (next_counter == 3'b101) ? inst : // wait longer than PC, Instruction fetch takes a while
+//                    inst;
 
 always @ (posedge clk)
 begin
 
+    counter <= next_counter;
     PC <= next_pc;
 
 end
+
 
 
 
@@ -229,29 +240,29 @@ end
 
 wire next_rd1, next_rd2;
 wire [4:0] next_addr1, next_addr2;
-assign next_addr1 = saved_inst[0][19:15];
-assign next_addr2 = saved_inst[0][24:20];
+assign next_addr1 = saved_inst[1][19:15];
+assign next_addr2 = saved_inst[1][24:20];
 
 assign next_rd1 =   //                      7'b0110111 // LUI (Load Upper Immediate) Spec. PDF-Page 37 
                     //                      7'b0010111 // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
                     //                      7'b1101111 // JAL (Jump And Link) Spec. PDF-Page 39 )
-                    (saved_inst[0][6:0] ==  7'b1100111) // JALR (Jump And Link Register) Spec. PDF-Page 39 
-                ||  (saved_inst[0][6:0] ==  7'b1100011) // BRANCH (Comparasion and Branch) Spec. PDF-Page 40 )
-                ||  (saved_inst[0][6:0] ==  7'b0000011) // LOAD (Load to Register) Spec. PDF-Page 42 )
-                ||  (saved_inst[0][6:0] ==  7'b0100011) // STORE (Store to Memory) Spec. PDF-Page 42 )
-                ||  (saved_inst[0][6:0] ==  7'b0010011) // OP_IMM (Integer Register-Immediate Instructions) Spec. PDF-Page 36 )
-                ||  (saved_inst[0][6:0] ==  7'b0110011) // OP (Integer Register-Register Instructions) Spec. PDF-Page 37 )
+                    (saved_inst[1][6:0] ==  7'b1100111) // JALR (Jump And Link Register) Spec. PDF-Page 39 
+                ||  (saved_inst[1][6:0] ==  7'b1100011) // BRANCH (Comparasion and Branch) Spec. PDF-Page 40 )
+                ||  (saved_inst[1][6:0] ==  7'b0000011) // LOAD (Load to Register) Spec. PDF-Page 42 )
+                ||  (saved_inst[1][6:0] ==  7'b0100011) // STORE (Store to Memory) Spec. PDF-Page 42 )
+                ||  (saved_inst[1][6:0] ==  7'b0010011) // OP_IMM (Integer Register-Immediate Instructions) Spec. PDF-Page 36 )
+                ||  (saved_inst[1][6:0] ==  7'b0110011) // OP (Integer Register-Register Instructions) Spec. PDF-Page 37 )
                 ;
 
 assign next_rd2 =   //                      7'b0110111 // LUI (Load Upper Immediate) Spec. PDF-Page 37 
                     //                      7'b0010111 // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
                     //                      7'b1101111 // JAL (Jump And Link) Spec. PDF-Page 39 )
                     //                      7'b1100111 // JALR (Jump And Link Register) Spec. PDF-Page 39 
-                    (saved_inst[0][6:0] ==  7'b1100011) // BRANCH (Comparasion and Branch) Spec. PDF-Page 40 )
+                    (saved_inst[1][6:0] ==  7'b1100011) // BRANCH (Comparasion and Branch) Spec. PDF-Page 40 )
                     //                      7'b0000011 // LOAD (Load to Register) Spec. PDF-Page 42 )
-                ||  (saved_inst[0][6:0] ==  7'b0100011) // STORE (Store to Memory) Spec. PDF-Page 42 )
+                ||  (saved_inst[1][6:0] ==  7'b0100011) // STORE (Store to Memory) Spec. PDF-Page 42 )
                     //                      7'b0010011 // OP_IMM (Integer Register-Immediate Instructions) Spec. PDF-Page 36 )
-                ||  (saved_inst[0][6:0] ==  7'b0110011) // OP (Integer Register-Register Instructions) Spec. PDF-Page 37 )
+                ||  (saved_inst[1][6:0] ==  7'b0110011) // OP (Integer Register-Register Instructions) Spec. PDF-Page 37 )
                 ;
                  
 always @ (posedge clk)
@@ -273,30 +284,30 @@ end
 wire [6:0] next_dp_ctrl;
 wire [19:0] next_immediate;
 wire [2:0] next_funct3;
-assign next_funct3 = saved_inst[1][14:12];
-assign next_dp_ctrl = saved_inst[1][6:0];
+assign next_funct3 = saved_inst[2][14:12];
+assign next_dp_ctrl = saved_inst[2][6:0];
 
 // Note:
 // assign variableName = (boolean expression here) ? (if boolean expression is true, do something here) : (if boolean expression is false, do something here);
 
                         // LUI (Load Upper Immediate) Spec. PDF-Page 37 
-assign next_immediate = (saved_inst[1][6:0] == 7'b0110111) ? saved_inst[1][31:12] : 
+assign next_immediate = (saved_inst[2][6:0] == 7'b0110111) ? saved_inst[2][31:12] : 
                         // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
-                        (saved_inst[1][6:0] == 7'b0010111) ? saved_inst[1][31:12] : 
+                        (saved_inst[2][6:0] == 7'b0010111) ? saved_inst[2][31:12] : 
                         // JAL (Jump And Link) Spec. PDF-Page 39 )
-                        (saved_inst[1][6:0] == 7'b1101111) ? {saved_inst[1][31], saved_inst[1][19:12], saved_inst[1][20], saved_inst[1][30:21]} : 
+                        (saved_inst[2][6:0] == 7'b1101111) ? {saved_inst[2][31], saved_inst[2][19:12], saved_inst[2][20], saved_inst[2][30:21]} : 
                         // JALR (Jump And Link Register) Spec. PDF-Page 39 )
-                        (saved_inst[1][6:0] == 7'b1100111) ? {8'd0, saved_inst[1][31:20]} : 
+                        (saved_inst[2][6:0] == 7'b1100111) ? {8'd0, saved_inst[2][31:20]} : 
                         // BRANCH (Comparasion and Branch) Spec. PDF-Page 40 )
-                        (saved_inst[1][6:0] == 7'b1100011) ? {8'b0, saved_inst[1][31], saved_inst[1][7], saved_inst[1][30:25], saved_inst[1][11:8]} : 
+                        (saved_inst[2][6:0] == 7'b1100011) ? {8'b0, saved_inst[2][31], saved_inst[2][7], saved_inst[2][30:25], saved_inst[2][11:8]} : 
                         // LOAD (Load to Register) Spec. PDF-Page 42 )
-                        (saved_inst[1][6:0] == 7'b0000011) ? {8'd0, saved_inst[1][31:20]} : 
+                        (saved_inst[2][6:0] == 7'b0000011) ? {8'd0, saved_inst[2][31:20]} : 
                         // STORE (Store to Memory) Spec. PDF-Page 42 )
-                        (saved_inst[1][6:0] == 7'b0100011) ? {8'd0, saved_inst[1][31:25], saved_inst[1][11:7]} : 
+                        (saved_inst[2][6:0] == 7'b0100011) ? {8'd0, saved_inst[2][31:25], saved_inst[2][11:7]} : 
                         // OP_IMM (Integer Register-Immediate Instructions) Spec. PDF-Page 36 )
-                        (saved_inst[1][6:0] == 7'b0010011) ? {8'd0, saved_inst[1][31:20]} : 
+                        (saved_inst[2][6:0] == 7'b0010011) ? {8'd0, saved_inst[2][31:20]} : 
                         // OP (Integer Register-Register Instructions) Spec. PDF-Page 37 )
-                        (saved_inst[1][6:0] == 7'b0110011) ? {13'd0, saved_inst[1][31:25]} : 
+                        (saved_inst[2][6:0] == 7'b0110011) ? {13'd0, saved_inst[2][31:25]} : 
                         // Everything else, unimplemented opcodes
                         20'b0;
                         
@@ -320,8 +331,8 @@ end
 
 wire [6:0] next_mem_ctrl;
 wire [2:0] next_mem_funct3;
-assign next_mem_ctrl = saved_inst[2][6:0];
-assign next_mem_funct3 = saved_inst[2][14:12];
+assign next_mem_ctrl = saved_inst[3][6:0];
+assign next_mem_funct3 = saved_inst[3][14:12];
 
 always @(posedge clk)
 begin
@@ -342,17 +353,17 @@ end
 wire next_wr1, next_wr2;
 wire [4:0] next_addr3;
 
-assign next_addr3 = saved_inst[3][11:7];
+assign next_addr3 = saved_inst[4][11:7];
 assign next_wr1 = next_wr2;
-assign next_wr2 =   (saved_inst[3][6:0] ==  7'b0110111) // LUI (Load Upper Immediate) Spec. PDF-Page 37 
-                ||  (saved_inst[3][6:0] ==  7'b0010111) // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
-                ||  (saved_inst[3][6:0] ==  7'b1101111) // JAL (Jump And Link) Spec. PDF-Page 39 )
-                ||  (saved_inst[3][6:0] ==  7'b1100111) // JALR (Jump And Link Register) Spec. PDF-Page 39 )
+assign next_wr2 =   (saved_inst[4][6:0] ==  7'b0110111) // LUI (Load Upper Immediate) Spec. PDF-Page 37 
+                ||  (saved_inst[4][6:0] ==  7'b0010111) // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
+                ||  (saved_inst[4][6:0] ==  7'b1101111) // JAL (Jump And Link) Spec. PDF-Page 39 )
+                ||  (saved_inst[4][6:0] ==  7'b1100111) // JALR (Jump And Link Register) Spec. PDF-Page 39 )
                 //                          7'b1100011: // BRANCH (Comparasion and Branch) Spec. PDF-Page 40 )
-                ||  (saved_inst[3][6:0] ==  7'b0000011) // LOAD (Load to Register) Spec. PDF-Page 42 )
+                ||  (saved_inst[4][6:0] ==  7'b0000011) // LOAD (Load to Register) Spec. PDF-Page 42 )
                 //                          7'b0100011: // STORE (Store to Memory) Spec. PDF-Page 42 )
-                ||  (saved_inst[3][6:0] ==  7'b0010011) // OP_IMM (Integer Register-Immediate Instructions) Spec. PDF-Page 36 )
-                ||  (saved_inst[3][6:0] ==  7'b0110011) // OP (Integer Register-Register Instructions) Spec. PDF-Page 37 )
+                ||  (saved_inst[4][6:0] ==  7'b0010011) // OP_IMM (Integer Register-Immediate Instructions) Spec. PDF-Page 36 )
+                ||  (saved_inst[4][6:0] ==  7'b0110011) // OP (Integer Register-Register Instructions) Spec. PDF-Page 37 )
                 
                 ;
  
@@ -364,271 +375,5 @@ assign next_wr2 =   (saved_inst[3][6:0] ==  7'b0110111) // LUI (Load Upper Immed
     addr3 <= next_addr3;
  
  end
- 
- 
- 
- 
-
-// FSM
-always @ (posedge clk)
-begin
-    if(rst) begin
-        state <= s0;
-    end
-    else begin
-       
-        case (state)
-    
-        s0:	    // Cycle 1 -- Decode / Start Reading Register File at Rising Clock edge
-            begin
-                dp_ctrl <= 0;
-                wr1 <= 0;
-                wr2 <= 0;
-                addr1 <= inst[7:4];
-                addr2 <= inst[3:0];
-                wr_pc_valid <= 1'b0;
-                saved_pc <= PC;
-                saved_inst <= inst; // Instruction input valid in future clock cycles due to pipeline. So, we save the instruction in an internal register.
-                state <= s1;
-                case (inst[6:0])
-                    
-                    // -------------------------------------- RISC-V --------------------------------------
-                    
-                    7'b0110111: // LUI (Load Upper Immediate) Spec. PDF-Page 37 
-                        begin
-                            rd1 <= 0;
-                            rd2 <= 0;
-                        end
-                    7'b0010111: // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
-                        begin
-                            rd1 <= 0;
-                            rd2 <= 0;
-                        end
-                    7'b1101111: // JAL (Jump And Link) Spec. PDF-Page 39 )
-                        begin
-                            rd1 <= 0;
-                            rd2 <= 0;
-                        end
-                    7'b1100111: // JALR (Jump And Link Register) Spec. PDF-Page 39 )
-                        begin
-                            rd1 <= 1;
-                            rd2 <= 0;
-                            addr1 <= inst[19:15];
-                        end
-                    7'b1100011: // BRANCH (Comparasion and Branch) Spec. PDF-Page 40 )
-                        begin
-                            rd1 <= 1;
-                            rd2 <= 1;
-                            addr1 <= inst[19:15];
-                            addr2 <= inst[24:20];
-                        end
-                    7'b0000011: // LOAD (Load to Register) Spec. PDF-Page 42 )
-                        begin
-                            rd1 <= 1;
-                            rd2 <= 0;
-                            addr1 <= inst[19:15];
-                        end
-                    7'b0100011: // STORE (Store to Memory) Spec. PDF-Page 42 )
-                        begin
-                            rd1 <= 1;
-                            rd2 <= 1;
-                            addr1 <= inst[19:15];
-                            addr2 <= inst[24:20];
-                        end
-                    7'b0010011: // OP_IMM (Integer Register-Immediate Instructions) Spec. PDF-Page 36 )
-                        begin
-                            rd1 <= 1;
-                            rd2 <= 0;
-                            addr1 <= inst[19:15];
-                        end
-                    7'b0110011: // OP (Integer Register-Register Instructions) Spec. PDF-Page 37 )
-                        begin
-                            rd1 <= 1;
-                            rd2 <= 1;
-                            addr1 <= inst[19:15];
-                            addr2 <= inst[24:20];
-                        end
-                    default:
-                        begin
-                            rd1 <= 0;
-                            rd2 <= 0;
-                        end
-                endcase
-            end
-    
-        s1 :	// Cycle 2 -- fetch operands from register file completed, clocked in immediate, datapath start propagating
-            begin
-                
-                dp_ctrl  <= saved_inst[6:0];
-                state <= s2;
-                case (saved_inst[6:0])
-                    // Set the control signals for the next phase
-                  
-                    // -------------------------------------- RISC-V --------------------------------------
-                    
-                    7'b0110111: // LUI (Load Upper Immediate) Spec. PDF-Page 37 
-                        begin
-                            immediate <= saved_inst[31:12];
-                        end
-                    7'b0010111: // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
-                        begin
-                            immediate <= saved_inst[31:12];
-                        end
-                    7'b1101111: // JAL (Jump And Link) Spec. PDF-Page 39 )
-                        begin
-                            immediate <= {saved_inst[31], saved_inst[19:12], saved_inst[20], saved_inst[30:21]};
-                        end
-                    7'b1100111: // JALR (Jump And Link Register) Spec. PDF-Page 39 )
-                        begin
-                            immediate <= {8'd0, saved_inst[31:20]};
-                        end
-                    7'b1100011: // BRANCH (Comparasion and Branch) Spec. PDF-Page 40 )
-                        begin
-                            immediate <= {8'b0, saved_inst[31], saved_inst[7], saved_inst[30:25], saved_inst[11:8]};
-                            funct3 <= saved_inst[14:12];
-                        end
-                    7'b0000011: // LOAD (Load to Register) Spec. PDF-Page 42 )
-                        begin
-                            immediate <= {8'd0, saved_inst[31:20]};
-                            funct3 <= saved_inst[14:12];
-                        end
-                    7'b0100011: // STORE (Store to Memory) Spec. PDF-Page 42 )
-                        begin
-                            immediate <= {8'd0, saved_inst[31:25], saved_inst[11:7]};
-                            funct3 <= saved_inst[14:12];
-                        end
-                    7'b0010011: // OP_IMM (Integer Register-Immediate Instructions) Spec. PDF-Page 36 )
-                        begin
-                            immediate <= {8'd0, saved_inst[31:20]};
-                            funct3 <= saved_inst[14:12];
-                        end
-                    7'b0110011: // OP (Integer Register-Register Instructions) Spec. PDF-Page 37 )
-                        begin
-                            immediate <= {13'd0, saved_inst[31:25]};
-                            funct3 <= saved_inst[14:12];
-                        end
-                    
-                endcase
-                
-            end
-        
-        s2:     // Cycle 3 -- datapath operation completed, if need memory access, start at this rising clock edge. Memory address calculation
-                //              completed at the previous clock cycle, in datapath.
-            begin
-                dp_ctrl  <= saved_inst[6:0];
-                funct3 <= saved_inst[14:12];
-                state <= s3;
-                
-            end
-        
-        s3 :	// Cycle 4 -- write back to register start at this clock edge
-            begin
-                dp_ctrl <= dp_ctrl;
-                rd1 <= 0;
-                rd2 <= 0;
-                addr1 <= saved_inst[11:8];
-                addr2 <= saved_inst[11:8];
-                wr1 <= 0;
-                wr2 <= 0;
-                state <= s4;
-                case (saved_inst[6:0])
-                    
-                    // -------------------------------------- RISC-V --------------------------------------
-                    
-                    7'b0110111: // LUI (Load Upper Immediate) Spec. PDF-Page 37 
-                    begin
-                        wr1 <= 1;
-                        wr2 <= 1;	
-                        addr1 <= saved_inst[11:7];
-                        addr2 <= saved_inst[11:7];
-                    end
-                    7'b0010111: // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
-                    begin
-                        wr1 <= 1;
-                        wr2 <= 1;	
-                        addr1 <= saved_inst[11:7];
-                        addr2 <= saved_inst[11:7];
-                    end
-                    7'b1101111: // JAL (Jump And Link) Spec. PDF-Page 39 )
-                    begin
-                        wr1 <= 1;
-                        wr2 <= 1;	
-                        addr1 <= saved_inst[11:7];
-                        addr2 <= saved_inst[11:7];
-                    end
-                    7'b1100111: // JALR (Jump And Link Register) Spec. PDF-Page 39 )
-                    begin
-                        wr1 <= 1;
-                        wr2 <= 1;
-                        addr1 <= saved_inst[11:7];
-                        addr2 <= saved_inst[11:7];
-                    end
-                    7'b1100011: // BRANCH (Comparasion and Branch) Spec. PDF-Page 40 )
-                    begin
-                        wr1 <= 0;
-                        wr2 <= 0;
-                    end
-                    7'b0000011: // LOAD (Load to Register) Spec. PDF-Page 42 )
-                    begin
-                        wr1 <= 1;
-                        wr2 <= 1;
-                        addr1 <= saved_inst[11:7];
-                        addr2 <= saved_inst[11:7];
-                    end
-                    7'b0100011: // STORE (Store to Memory) Spec. PDF-Page 42 )
-                    begin
-                        wr1 <= 0;
-                        wr2 <= 0;
-                    end
-                    7'b0010011: // OP_IMM (Integer Register-Immediate Instructions) Spec. PDF-Page 36 )
-                    begin
-                        wr1 <= 1;
-                        wr2 <= 1;
-                        addr1 <= saved_inst[11:7];
-                        addr2 <= saved_inst[11:7];
-                    end
-                    7'b0110011: // OP (Integer Register-Register Instructions) Spec. PDF-Page 37 )
-                    begin
-                        wr1 <= 1;
-                        wr2 <= 1;
-                        addr1 <= saved_inst[11:7];
-                        addr2 <= saved_inst[11:7];
-                    end
-                    
-                endcase
-                
-            end
-    
-        s4 :	// Cycle 5 -- Next Instruction Fetch
-            begin
-                rd1 <= 0;
-                rd2 <= 0;
-                wr1 <= 0;
-                wr2 <= 0;
-                state <= s0;
-                case (saved_inst[6:0])
-                    // -------------------------------------- RISC-V --------------------------------------
-                    
-                    7'b1101111: // JAL (Jump And Link) Spec. PDF-Page 39 )
-                    begin
-                        wr_pc_valid <= 1'b1;
-                    end
-                    7'b1100111: // JALR (Jump And Link Register) Spec. PDF-Page 39 )
-                    begin
-                        wr_pc_valid <= 1'b1;
-                    end
-                    7'b1100011: // BRANCH (Comparasion and Branch) Spec. PDF-Page 40 )
-                    begin
-                        wr_pc_valid <= 1'b1;
-                    end
-                    default:
-                    begin
-                        wr_pc_valid <= 1'b0;
-                    end
-                endcase
-            end
-        endcase
-	end
-end
 
 endmodule
