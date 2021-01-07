@@ -20,7 +20,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 
-module Control (clk, rst, addr1, addr2, addr3, rd1, rd2, wr1, wr2, dp_ctrl, immediate, funct3, mem_ctrl, mem_funct3, inst, PC, dp_pc, wr_pc, forward_ctrl1, forward_ctrl2);
+module Control (clk, rst, addr1, addr2, addr3, rd1, rd2, wr1, wr2, dp_ctrl, immediate, funct3, mem_ctrl, mem_funct3, 
+                inst, PC, dp_pc, wr_pc, forward_ctrl1, forward_ctrl2, branch_taken);
 input clk;
 input rst;
 input [31:0] inst;
@@ -40,6 +41,7 @@ output reg [6:0] mem_ctrl;
 output reg [2:0] mem_funct3;
 
 output reg [1:0] forward_ctrl1, forward_ctrl2;
+input branch_taken;
 
 wire [1:0] forward_ctrl1_next, forward_ctrl2_next;
 
@@ -49,6 +51,8 @@ wire [31:0] next_saved_inst0, next_saved_inst1, next_saved_inst2, next_saved_ins
 wire [31:0] next_saved_pc0, next_saved_pc1, next_saved_pc2, next_saved_pc3, next_saved_pc4;
 
 wire [31:0] next_inst;
+wire [31:0] next_pc;
+wire pipeline_flush;
 /*
 rise    reset low, PC unknown, instruction unknown
 fall    reset high, next PC - 0, next instruction - NOP, next counter - 0
@@ -65,10 +69,10 @@ fall
 
 
 assign next_saved_inst0 = rst ? NOP : next_inst;
-assign next_saved_inst1 = rst ? NOP : saved_inst[0];
-assign next_saved_inst2 = rst ? NOP : saved_inst[1];
-assign next_saved_inst3 = rst ? NOP : saved_inst[2];
-assign next_saved_inst4 = rst ? NOP : saved_inst[3];
+assign next_saved_inst1 = rst ? NOP : (pipeline_flush ? NOP : saved_inst[0]);
+assign next_saved_inst2 = rst ? NOP : (pipeline_flush ? NOP : saved_inst[1]);
+assign next_saved_inst3 = rst ? NOP : (pipeline_flush ? NOP : saved_inst[2]);
+assign next_saved_inst4 = rst ? NOP : (pipeline_flush ? NOP : saved_inst[3]);
 
 assign next_saved_pc0 = rst ? 32'b0 : PC;
 assign next_saved_pc1 = rst ? 32'b0 : saved_pc[0];
@@ -145,9 +149,9 @@ rise    instruction get discarded, instruction MEM result going in register, WB 
 fall
 
 */
-reg [2:0] counter;
-wire [2:0] next_counter;
-wire [31:0] next_pc;
+reg [3:0] counter;
+wire [3:0] next_counter;
+
 
 
 wire need_rs1 =     //                  7'b0110111 // LUI (Load Upper Immediate) Spec. PDF-Page 37 
@@ -174,41 +178,133 @@ wire need_rs2 =     //                  7'b0110111 // LUI (Load Upper Immediate)
 
 wire rs1_rd_same = need_rs1 && inst[19:15] == saved_inst[0][11:7];
 wire rs2_rd_same = need_rs2 && inst[24:20] == saved_inst[0][11:7];
+
+// The current instruction is load, next instruction need to use load result, insert a nop
 wire load_stall = (rs1_rd_same || rs2_rd_same) && (saved_inst[0][6:0] ==  7'b0000011); // LOAD (Load to Register) Spec. PDF-Page 42 )
 
 
-wire not_normal =(  (saved_inst[0][6:0] == 7'b1101111) // JAL (Jump And Link) Spec. PDF-Page 39 )
-                ||  (saved_inst[0][6:0] == 7'b1100111) // JALR (Jump And Link Register) Spec. PDF-Page 39 )
-                ||  (saved_inst[0][6:0] == 7'b1100011) // BRANCH (Comparasion and Branch) Spec. PDF-Page 40 )
-                );
+reg [1:0] branch_prediction_fsm;
+reg [1:0] branch_prediction_fsm_next;
+wire is_branch = next_counter == 4'b1011;
+
+wire branch_predict_taken = branch_prediction_fsm == 2'b11 || branch_prediction_fsm == 2'b10;
+
+always @ (posedge clk)
+begin
+    branch_prediction_fsm <= branch_prediction_fsm_next;
+end
+always @ (*)
+begin
+    if (rst)
+    begin
+        branch_prediction_fsm_next <= 2'b00;
+    end
+    else if(branch_prediction_fsm == 2'b00)
+    begin
+        branch_prediction_fsm_next <= is_branch ? (branch_taken ? 2'b01 : 2'b00) : 
+                                                    2'b00;
+    end
+    else if(branch_prediction_fsm == 2'b01)
+    begin
+        branch_prediction_fsm_next <= is_branch ? (branch_taken ? 2'b11 : 2'b00) : 
+                                                    2'b01;
+    end
+    else if(branch_prediction_fsm == 2'b10)
+    begin
+        branch_prediction_fsm_next <= is_branch ? (branch_taken ? 2'b11 : 2'b00) : 
+                                                    2'b10;
+    end
+    else if(branch_prediction_fsm == 2'b11)
+    begin
+        branch_prediction_fsm_next <= is_branch ? (branch_taken ? 2'b11 : 2'b10) : 
+                                                    2'b11;
+    end
+    else
+    begin
+        branch_prediction_fsm_next <= 2'b00;
+    end
+
+end
+
+
+// for JAL and BRANCH we can get new pc from instruction, that's how we predict it
+reg [31:0] predict_pc;
+always @ (*)
+
+    begin
+    if (inst[6:0] == 7'b1101111) // JAL (Jump And Link) Spec. PDF-Page 39 )
+    begin
+        predict_pc <= {{12{inst[31]}}, inst[19:12], inst[20], inst[30:21], 1'b0} + PC;
+    end
+    else if (inst[6:0] == 7'b1100011) // BRANCH (Comparasion and Branch) Spec. PDF-Page 40 )
+    begin
+        if (branch_predict_taken) 
+        begin
+            predict_pc <= {{19{inst[31]}}, inst[31], inst[7], inst[30:25], inst[11:8], 1'b0} + PC;
+        end
+        else 
+        begin
+            predict_pc <= PC + 32'd4;
+        end
+    end
+    else
+    begin
+        predict_pc <= 32'b0;
+    end
+end
+
+wire use_predict_pc =   (inst[6:0] == 7'b1101111) // JAL (Jump And Link) Spec. PDF-Page 39 )
+                    ||  (inst[6:0] == 7'b1100011) // BRANCH (Comparasion and Branch) Spec. PDF-Page 40 )
+                    ;
+
+// can't use predication here, have to read register value
+wire not_normal =(saved_inst[0][6:0] == 7'b1100111); // JALR (Jump And Link Register) Spec. PDF-Page 39 )
                 
 wire is_normal = ~not_normal;
 
-assign next_counter =   rst ? (3'b000) :
-                        (counter == 3'b000) ? (load_stall ? counter + 3'b001 : (is_normal ? 3'b000 : 3'b010)) : 
-                        (counter == 3'b001) ? 3'b000 : 
-                        (counter == 3'b010) ? (counter + 3'b001) :
-                        (counter == 3'b011) ? (counter + 3'b001) :
-                        (counter == 3'b100) ? (counter + 3'b001) :
-                        (counter == 3'b101) ? (counter + 3'b001) :
-                        (counter == 3'b110) ? (3'b000) : (3'b000);
+assign next_counter =   rst ? (4'b0000) :
+                        (counter == 4'b0000) ? (load_stall ? counter + 4'b0001 : (not_normal ? 4'b0010 : (use_predict_pc ? 4'b0111 : 4'b0000))) : 
+                        (counter == 4'b0001) ? 4'b0000 : 
+                        (counter == 4'b0010) ? (counter + 4'b0001) :
+                        (counter == 4'b0011) ? (counter + 4'b0001) :
+                        (counter == 4'b0100) ? (counter + 4'b0001) :
+                        (counter == 4'b0101) ? (counter + 4'b0001) :
+                        (counter == 4'b0110) ? (4'b0000) :
+                        (counter == 4'b0111) ? (counter + 4'b0001) :
+                        (counter == 4'b1000) ? (counter + 4'b0001) : 
+                        (counter == 4'b1001) ? (counter + 4'b0001) :
+                        (counter == 4'b1010) ? (counter + 4'b0001) :
+                        (counter == 4'b1011) ? (4'b0000) : (4'b0000);
 
 assign next_pc =    rst ? (32'b0) : 
-                    (next_counter == 3'b000) ? (PC + 32'd4) :
-                    (next_counter == 3'b001) ? PC : 
-                    (next_counter == 3'b010) ? PC :
-                    (next_counter == 3'b011) ? PC :
-                    (next_counter == 3'b100) ? PC :
-                    (next_counter == 3'b101) ? wr_pc : (PC + 32'd4);
+                    (next_counter == 4'b0000) ? (PC + 32'd4) :
+                    (next_counter == 4'b0001) ? PC : 
+                    (next_counter == 4'b0010) ? PC :
+                    (next_counter == 4'b0011) ? PC :
+                    (next_counter == 4'b0100) ? PC :
+                    (next_counter == 4'b0101) ? wr_pc : 
+                    (next_counter == 4'b0111) ? predict_pc : 
+                    (next_counter == 4'b1000) ? (PC + 32'd4) : 
+                    (next_counter == 4'b1001) ? (PC + 32'd4) : 
+                    (next_counter == 4'b1010) ? (PC + 32'd4) : 
+                    (next_counter == 4'b1011) ? (branch_taken != branch_predict_taken ? wr_pc : PC + 32'd4) : 
+                    (PC + 32'd4);
                     
-assign next_inst =  (next_counter == 3'b000) ? inst :
-                    (next_counter == 3'b001) ? NOP : 
-                    (next_counter == 3'b010) ? NOP : 
-                    (next_counter == 3'b011) ? NOP : 
-                    (next_counter == 3'b100) ? NOP : 
-                    (next_counter == 3'b101) ? NOP : // wait longer than PC, Instruction fetch takes a while
-                    (next_counter == 3'b110) ? inst : inst; 
+assign next_inst =  (next_counter == 4'b0000) ? inst :
+                    (next_counter == 4'b0001) ? NOP : 
+                    (next_counter == 4'b0010) ? NOP : 
+                    (next_counter == 4'b0011) ? NOP : 
+                    (next_counter == 4'b0100) ? NOP : 
+                    (next_counter == 4'b0101) ? NOP : // wait longer than PC, Instruction fetch takes a while
+                    (next_counter == 4'b0110) ? inst : 
+                    (next_counter == 4'b0111) ? inst : 
+                    (next_counter == 4'b1000) ? inst : 
+                    (next_counter == 4'b1001) ? inst : 
+                    (next_counter == 4'b1010) ? inst : 
+                    (next_counter == 4'b1011) ? (branch_taken != branch_predict_taken ? NOP : inst) :
+                    (next_counter == 4'b1100) ? inst : inst; 
 
+assign pipeline_flush = next_counter == 4'b1011 && branch_taken != branch_predict_taken;
 
 //assign next_counter =   rst ? (3'b000) : 
 //                        (counter == 3'b000) ? (is_normal ? 3'b000 : counter + 3'b001) : 

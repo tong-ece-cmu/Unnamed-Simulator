@@ -1,8 +1,8 @@
 This is a readme about my simulator
 
-A 5 stage pipelined CPU written in Verilog, adhered to RISC-V ISA, more specifically RV32I Base Insturction Set, with data forwarding to minimize CPU stall caused by RAW Hazards.
+A 5 stage pipelined CPU written in Verilog, adhered to RISC-V ISA, more specifically RV32I Base Insturction Set, with data forwarding to minimize CPU stall caused by RAW Hazards and dynamic local branch predicator to minimize CPU stall caused by branch hazard. 
 
-Tested critical parts of the processor with binary machine code.
+An assembler wiritten in Python, convert assembly to binary machine code. Verified the processor behavior with various test cases using the binary machine code.
 
 # Notes
 

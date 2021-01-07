@@ -88,9 +88,9 @@ initial begin
 //    $readmemh("RAWhandling3.mem", imem); // Register 2 should contain 0x40
 //    $readmemh("RAWhandling4.mem", imem); // Register 2 should contain 0x40
 //    $readmemh("RAWhandlingRS2.mem", imem); // Register 2 should contain 0x40
-    $readmemh("LoadStore.mem", imem); // Register 2 <- 0x40 and Mem 0 <- 0x20
+//    $readmemh("LoadStore.mem", imem); // Register 2 <- 0x40 and Mem 0 <- 0x20
 //    $readmemh("BranchStall.mem", imem); // Register 2 <- 0x03
-//    $readmemh("BranchStallTaken.mem", imem); // Register 2 <- 0x06
+    $readmemh("BranchStallTaken.mem", imem); // Register 2 <- 0x06
     
 end
 
