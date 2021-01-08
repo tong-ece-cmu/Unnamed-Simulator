@@ -20,7 +20,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 
-module Control (clk, rst, addr1, addr2, addr3, rd1, rd2, wr1, wr2, dp_ctrl, immediate, funct3, mem_ctrl, mem_funct3, 
+module Control (clk, rst, addr1, addr2, addr3, rd1, rd2, wr1, wr2, dp_ctrl, immediate, funct3, mem_ctrl, mem_funct3, freeze_cpu, 
                 inst, PC, dp_pc, wr_pc, forward_ctrl1, forward_ctrl2, branch_taken);
 input clk;
 input rst;
@@ -39,7 +39,7 @@ input [31:0] wr_pc;
 output reg [2:0] funct3;
 output reg [6:0] mem_ctrl;
 output reg [2:0] mem_funct3;
-
+input freeze_cpu;
 output reg [1:0] forward_ctrl1, forward_ctrl2;
 input branch_taken;
 
@@ -68,17 +68,17 @@ fall
 */
 
 
-assign next_saved_inst0 = rst ? NOP : next_inst;
-assign next_saved_inst1 = rst ? NOP : (pipeline_flush ? NOP : saved_inst[0]);
-assign next_saved_inst2 = rst ? NOP : (pipeline_flush ? NOP : saved_inst[1]);
-assign next_saved_inst3 = rst ? NOP : (pipeline_flush ? NOP : saved_inst[2]);
-assign next_saved_inst4 = rst ? NOP : (pipeline_flush ? NOP : saved_inst[3]);
+assign next_saved_inst0 = rst ? NOP : (freeze_cpu ? saved_inst[0] : next_inst);
+assign next_saved_inst1 = rst ? NOP : (freeze_cpu ? saved_inst[1] : (pipeline_flush ? NOP : saved_inst[0]));
+assign next_saved_inst2 = rst ? NOP : (freeze_cpu ? saved_inst[2] : (pipeline_flush ? NOP : saved_inst[1]));
+assign next_saved_inst3 = rst ? NOP : (freeze_cpu ? saved_inst[3] : (pipeline_flush ? NOP : saved_inst[2]));
+assign next_saved_inst4 = rst ? NOP : (freeze_cpu ? saved_inst[4] : (pipeline_flush ? NOP : saved_inst[3]));
 
-assign next_saved_pc0 = rst ? 32'b0 : PC;
-assign next_saved_pc1 = rst ? 32'b0 : saved_pc[0];
-assign next_saved_pc2 = rst ? 32'b0 : saved_pc[1];
-assign next_saved_pc3 = rst ? 32'b0 : saved_pc[2];
-assign next_saved_pc4 = rst ? 32'b0 : saved_pc[3];
+assign next_saved_pc0 = rst ? 32'b0 : (freeze_cpu ? saved_pc[0] : PC);
+assign next_saved_pc1 = rst ? 32'b0 : (freeze_cpu ? saved_pc[1] : saved_pc[0]);
+assign next_saved_pc2 = rst ? 32'b0 : (freeze_cpu ? saved_pc[2] : saved_pc[1]);
+assign next_saved_pc3 = rst ? 32'b0 : (freeze_cpu ? saved_pc[3] : saved_pc[2]);
+assign next_saved_pc4 = rst ? 32'b0 : (freeze_cpu ? saved_pc[4] : saved_pc[3]);
 
 
 
@@ -199,6 +199,10 @@ begin
     begin
         branch_prediction_fsm_next <= 2'b00;
     end
+    else if (freeze_cpu)
+    begin
+        branch_prediction_fsm_next <= branch_prediction_fsm;
+    end
     else if(branch_prediction_fsm == 2'b00)
     begin
         branch_prediction_fsm_next <= is_branch ? (branch_taken ? 2'b01 : 2'b00) : 
@@ -263,6 +267,7 @@ wire not_normal =(saved_inst[0][6:0] == 7'b1100111); // JALR (Jump And Link Regi
 wire is_normal = ~not_normal;
 
 assign next_counter =   rst ? (4'b0000) :
+                        freeze_cpu ? counter : 
                         (counter == 4'b0000) ? (load_stall ? counter + 4'b0001 : (not_normal ? 4'b0010 : (use_predict_pc ? 4'b0111 : 4'b0000))) : 
                         (counter == 4'b0001) ? 4'b0000 : 
                         (counter == 4'b0010) ? (counter + 4'b0001) :
@@ -277,6 +282,7 @@ assign next_counter =   rst ? (4'b0000) :
                         (counter == 4'b1011) ? (4'b0000) : (4'b0000);
 
 assign next_pc =    rst ? (32'b0) : 
+                    freeze_cpu ? PC : 
                     (next_counter == 4'b0000) ? (PC + 32'd4) :
                     (next_counter == 4'b0001) ? PC : 
                     (next_counter == 4'b0010) ? PC :
