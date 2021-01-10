@@ -56,6 +56,22 @@ In the To create a user-defined macro section, it tells us how to set up macro. 
 
 The INSTAL file in the top directory also had a section on Creating SystemC Applications, follow that. Also, when I created my own SystemC application, I needed to create new property page and set those marcos again.
 
+## Windows 10 .vcd file waveform viewer
+
+I used GTKWave. There is a windows version here: http://dspia.com/gtkwave.html
+
+Just like the it said in the website, I downloaded gtkwave.exe.gz and all_libs.tar.gz
+
+Then I removed the .gz extension on gtkwave.exe.gz and used 7-zip to decompress all_libs.tar.gz
+
+Then I put gtkwave.exe into the decompressed bin folder. And double click on the .exe file to open the gtkwave waveform viewer window.
+
+This Github post told me to put .exe into bin folder: https://stackoverflow.com/questions/17254321/how-do-i-install-gtkwave-on-windows
+
+Then use open new tab to open the vcd file, then drag the signal into main panel to view them. I mostly just select the clock signal and use find next edge button to increment through the clock to check the value of different signals. Watching the graphical waveform is kind distracting in my opinion.
+
+GTKWave mannual if needed: http://gtkwave.sourceforge.net/gtkwave.pdf
+
 # Tasks
 
 ## Create a SystemC model for our little architecture
@@ -102,6 +118,14 @@ A* in C: https://rosettacode.org/wiki/A*_search_algorithm
 ## TCM - Tightly Coupled Memory
 
 It's a small memory that sits right next to CPU. It's fast and can be accessed in one clock cycle. It's different from cache as it has its own physical address space. Cache doesn't have its own address space, it just exist there to do make some memory access faster. 
+
+## List of tools used for VLSI design
+
+I found it here: http://www.vlsiacademy.org/open-source-cad-tools.html
+
+They have a tool for pcb placement with netlist extraction included.
+
+They also have a IC layout tool and routing tool. And simulation tools.
 
 ## Notes while doing it
 
