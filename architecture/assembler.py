@@ -4,7 +4,12 @@ Created on Wed Jan  6 09:43:45 2021
 
 @author: Tong
 """
+import enum
+class TargetOptions(enum.Enum):
+   VivadoMem = 1
+   SystemcArray = 2
 
+assembler_target = TargetOptions.SystemcArray
 
 asem = '''ADDI x1, x0, 1
 BEQ x1, x1, 12
@@ -21,6 +26,9 @@ NOP'''
     # print maching code
     
 import re
+
+def printInstArray(mc):
+    print("0x{0:0{1}X}, ".format(mc, 8))
 
 def getOperands(tokens):
     operand = [0, 0, 0]
@@ -89,8 +97,11 @@ for s in asem.splitlines():
     tokens = re.split(', | |,', s)
     oprd = getOperands(tokens)
     mc = getMachineCode(tokens, oprd)
-    printHex(mc)
-
+    
+    if assembler_target == TargetOptions.VivadoMem:
+        printHex(mc)
+    elif assembler_target == TargetOptions.SystemcArray:
+        printInstArray(mc)
 
 
 

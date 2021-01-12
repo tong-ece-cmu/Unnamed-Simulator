@@ -1,8 +1,12 @@
+# Architecture No.2
+
 This the design note for architecture #2
 
 This will use issue out of order architecture with researvation stations.
 
 Will have multiple function units.
+
+Not supporting multiplier right now.
 
 ## The first set of Flip-flops stores the instruction
 
@@ -18,7 +22,7 @@ DeMultiplexer has selection bits that choose which output will gets the input. T
 
 The chain of if statement will be an unbalanced-tree of demutiplexers. The instruction opcode will travel through the wire of those demutiplexers and finally reaches the input of the flip-flops of the desired reservation entry. Or reach nothing if station is full.
 
-The register file will have flip-flops(marker) that will keep track which register will be written in the near future, beacause it's the write back target of one of the instructions in the reservation station. We use our destination operand to get a one to the approporate field of the marker, to mark it so future instruction will see it. And there is a multiplexer in the end to present marker original content, if we can't get a reservation station entry.
+The register file will have flip-flops(marker) that will keep track which register will be written in the near future, beacause it's the write back target of one of the instructions in the reservation station. We use our destination operand to get a one to the approporate field of the marker, to mark it so future instruction will see it. And there is a multiplexer in the end to present marker original content, if we can't get a reservation station entry. The marker will store the reservation station entry ID. We will have five entry for add unit, five entry for load and store unit, so that's 10 IDs needed. We will use ID 0 as unmarked. And ID 1-10 as valid entry ID. ID will be 4 bit.
 
 We will also present our future reservation station entry number to the marker flip-flop input, to get clocked in at the next positive clock edge. If entry0 is not valid, present ID of entry0, else if entry1 is not valid, present ID of entry1, else if ... . And there is a multiplexer in the end, if reservation station is full, present the marker original conent, as we wait for reservation station to free up entries.
 
@@ -54,3 +58,38 @@ Register file will also check the common data bus. If the common data bus ID mat
 Result of function unit are stored into flip-flops. Load and Store unit data valid flip-flop is set.
 
 If load and store unit has data, valid bit is set, boardcast it on common data bus. Else if arithmatic unit has data, valid bit is set, boardcast it on common data bus. The common data bus should have a valid bit to signal its data is valid. 
+
+
+
+# System C Implementation Issues
+
+System C syntax is complicated with hard to find documentation. Right now, I'm working on the first set and second set of flip-flops and the combinational logic inbetween. There suppose to be three modules, Instruction fetch unit that gives instruction(The first set of flip-flops), Reservation Station that takes in instructions(The second set of flip-flops), and Register file(Supply data to reservation station, using instruction). 
+
+The combinational logic should ask the register file to read data out and send it to reservation station to get clocked in. This transfer of data back and forth all happens in one cycle. We can have four module, IF, RF, Reservation Station, Combinational logic. And have combinational logic wait on negative edge of the clock and other wait on positive edge of the clock. Combinational logic suppose to have the whole clock cycle to process it, but it's systemc, so we can change it a little bit. We just need the simulation to run correctly to some degree.
+
+There are so many wires and signals, 32 register file data line, and ID tags. We can use sc_vector < sc_in \<unsigned\> > to create a vector input or output. Nice.
+
+A few minutes later ...
+
+Surprise! The vector syntax doesn't work. I'm pretty sure I need to initialize the vector somewhere. But I don't know how. The VCD file format doesn't look too complicated. 
+\
+\
+Plan B.
+We can use python to generate those vector declarations. For reservation station, we need 6 wires for each entry, rs1, rs2, entry valid, rs1_mark, rs2_mark, and instruction. We have 5 entry so far, so that's 30 wires. We are modeling the flip-flop in this module, so we need seperate wire for flip-flop input and output. So that's a grand total of 60 wires. 
+
+So the flip-flop will have a big block of code that will just do (private_entry = sc_in) and (sc_out = sc_in) for each wire. 
+
+Let me summary, there are three blocks of code that we need to generate. The declaration block, and assignment blcok for the reservation flip-flop module, combinational logic input declaration. The declaration block should have 60 lines. The assignment block should have 60 lines, 6 wire per entry, 5 entry, 2 assignments per entry. And combinational logic input declaration should have 60 lines. 
+
+There are more, in the main module, we need to connect those two modules together. We need to create the connection wires, 60 lines. Each module need to connect to the wire, two module with 60 line each, 120 lines.
+
+Register file is another beast. 32 registers, each will have next and output, so that's 64 lines. And there is the ID field for each register, with input and output, 64 lines.
+
+I'm going to ask around online. While waiting for an answer, I'm going to do some planning on the cache structure and assembler.
+
+Someone give this guy a metal, he helped me figure out the vector syntax.
+https://stackoverflow.com/users/5942006/systemcpro
+
+https://stackoverflow.com/questions/35425052/how-to-initialize-a-systemc-port-name-which-is-an-array/35535730#35535730
+
+
