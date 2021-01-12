@@ -87,9 +87,18 @@ Register file is another beast. 32 registers, each will have next and output, so
 
 I'm going to ask around online. While waiting for an answer, I'm going to do some planning on the cache structure and assembler.
 
-Someone give this guy a metal, he helped me figure out the vector syntax.
+Someone give this guy a medal, he helped me figure out the vector syntax.
 https://stackoverflow.com/users/5942006/systemcpro
 
 https://stackoverflow.com/questions/35425052/how-to-initialize-a-systemc-port-name-which-is-an-array/35535730#35535730
 
 
+
+All the combinational logic has to be in one module and the flip-flops in their seperated module. If we seperate the combinational logic into different modules and coalesse them with the flip-flops modules, then the order of simulator event will be a problem. At the clock edge, the simulator call the flip-flops module coroutines and some combinational logic will process the output using the old value of the other flip-flops.
+
+The instruction fetch unit will take one cycle to fetch instruction. Meaning, there is a 32-bit flip-flop that will record the next PC value, and it will take a cycle to fetch the instruction. So the instruction pointed by the pc will appear on the wire on the next clock edge. If we don't do this, we record the PC at the clock edge and after the clock edge, the correct instruction just appeared on the wire. That's not normal, natural, or correct.
+
+I used a circular buffer to implement it. It's possible to use a small variable to easily implement this latency, but we need to think about the future. In the future, we may want to model an Instruction Cache, and there will be a lot more latency that can't be modeled using small variable.
+
+
+The second block of combinational logic. They need to find one entry to execute.
