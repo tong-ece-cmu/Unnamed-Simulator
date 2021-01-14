@@ -11,13 +11,21 @@ class TargetOptions(enum.Enum):
 
 assembler_target = TargetOptions.SystemcArray
 
-asem = '''ADDI x1, x0, 1
+p1 = '''ADDI x1, x0, 1
 BEQ x1, x1, 12
 ADDI x1, x1, 2
 JAL x0, 8
 ADDI x1, x1, 4
 ADDI x1, x1, 1
 NOP'''
+
+p2 = '''ADDI x1, x0, 3
+ADDI x1, x1, 1
+ADDI x1, x1, 2
+ADDI x1, x1, 1
+'''
+
+asem = p2
 
 # for each line
     # get list of tokens, split string on space and comma

@@ -57,8 +57,11 @@ Register file will also check the common data bus. If the common data bus ID mat
 
 Result of function unit are stored into flip-flops. Load and Store unit data valid flip-flop is set.
 
-If load and store unit has data, valid bit is set, boardcast it on common data bus. Else if arithmatic unit has data, valid bit is set, boardcast it on common data bus. The common data bus should have a valid bit to signal its data is valid. 
+If load and store unit has data, and there is a valid entry ID, boardcast it on common data bus. Else if arithmatic unit has data, and there is a valid entry ID, boardcast it on common data bus. Any thing above zero is a valid entry ID. 
 
+There are mutliple function unit that tries to use the common data bus. If the result wasn't able to boardcast this cycle. We need hold on to it and wait for the next cycle. The function result will need to keep its value. The reservation station entry been executed need to keep its value.
+
+We will have a wire going to exe combinational logic block and issue combinational logic block to tell them the result wasn't broadcasted. 
 
 
 # System C Implementation Issues
@@ -102,3 +105,24 @@ I used a circular buffer to implement it. It's possible to use a small variable 
 
 
 The second block of combinational logic. They need to find one entry to execute.
+
+
+When pressing reset, while reset is high, the rising clock edge should get zero on PC and NOP. After the reset is low, next rising clock edge should get PC incremented, and still get NOP. Then at the next clock edge, PC increment again and the instruction should be the previous PC fetch.
+
+
+For each register, it needs to check common data bus. 
+read 0, march ID
+If on register 0, clear ID marker, if needed by other instruction, present 0.
+
+Else if the common data bus ID matches and valid, it will clear ID marker and write new value from common data bus. If it's needed by other instruction for read. Present the new value. If it's needed by other instruction for write, overwrite ID marker and keep its value. 
+
+Else if the common data bus ID doesn't match or not valid, keep its marker value and register value. If it's needed by other instruction for read, if marked, present ID, if not marked, present register value. If needed for write, overwrite ID marker and keep its value.
+
+We got a problem. The events of the simulator are triggered sequentially. So when I put different combinational logic in different module and have all of them change on negative edge of clock, the behavior is wrong. There are 3 blocks of combinational logic and they are inter-dependent. The first block will generate some signals that's needed by the second block, the second block will generate something needed by the third block. And the third block will loop-back, generating something needed by the first block. They are realistic and can be implemented by the transistor and wire. But it's not obvious how to get the simulator to do it. The issuing stage will need to read the common data bus values and fetch operand from register files.
+
+There is something called next_trigger and SC_METHOD. This sounds like a good place to put in combinational logic. 
+https://forums.accellera.org/topic/6004-sc_method-and-next_trigger-diagnostics/
+
+But next_trigger will complicate things. If we marked an register for destination. Then a common data bus signal comes in and overwrite that destination with data. Just because the event scheduler called the common data bus signal late. We then lost our mark on the destination and mess up all the insturction after it.
+
+It's better to have all combinational logic in one module.
