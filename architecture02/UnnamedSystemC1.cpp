@@ -407,6 +407,12 @@ public:
     sc_in<unsigned> cdb_com_data;
     sc_in<unsigned> cdb_com_ID;
 
+    sc_vector < sc_in<unsigned> > issue_fifo_reg;
+    sc_vector < sc_out<unsigned> > issue_fifo_next;
+
+    sc_in<unsigned> issue_fifo_last_reg;
+    sc_out<unsigned> issue_fifo_last_next;
+
     //Constructor
     SC_CTOR(issue_combinational) : entry_valid_reg("entry_valid_reg", ENTRY_COUNT), entry_rs1_mark_reg("entry_rs1_mark_reg", ENTRY_COUNT),
         entry_rs2_mark_reg("entry_rs2_mark_reg", ENTRY_COUNT), entry_rs1_reg("entry_rs1_reg", ENTRY_COUNT), entry_rs2_reg("entry_rs2_reg", ENTRY_COUNT),
@@ -441,6 +447,8 @@ public:
 
                     entry_valid_next[i].write(0);
                     entry_inst_next[i].write(entry_inst_reg[i]);
+
+                    issue_fifo_next[i].write(0);
                 }
 
                 for (unsigned i = 0; i < REGISTER_COUNT; i++)
@@ -451,6 +459,8 @@ public:
 
                 if_pc_next.write(0);
 
+
+                issue_fifo_last_next.write(0);
                 //continue;
                 return;
             }
@@ -460,11 +470,103 @@ public:
             unsigned rd = instv >> 7 & 0x1F;
             unsigned rs1 = instv >> 15 & 0x1F;
             unsigned rs2 = instv >> 20 & 0x1F;
-           
-            //unsigned* temp_entry_valid_next = new unsigned[ENTRY_COUNT];
+            unsigned opcode = instv & 0x7F;
+
+            bool need_rs1 = //                  7'b0110111 // LUI (Load Upper Immediate) Spec. PDF-Page 37 
+                            //                  7'b0010111 // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
+                            //                  7'b1101111 // JAL (Jump And Link) Spec. PDF-Page 39 )
+                            (opcode == 0b1100111)  // JALR (Jump And Link Register) Spec. PDF-Page 39 
+                        ||  (opcode == 0b1100011)  // BRANCH (Comparasion and Branch) Spec. PDF-Page 40 )
+                        ||  (opcode == 0b0000011)  // LOAD (Load to Register) Spec. PDF-Page 42 )
+                        ||  (opcode == 0b0100011)  // STORE (Store to Memory) Spec. PDF-Page 42 )
+                        ||  (opcode == 0b0010011)  // OP_IMM (Integer Register-Immediate Instructions) Spec. PDF-Page 36 )
+                        ||  (opcode == 0b0110011)  // OP (Integer Register-Register Instructions) Spec. PDF-Page 37 )
+                        ;
+
+            bool need_rs2 = //                  7'b0110111 // LUI (Load Upper Immediate) Spec. PDF-Page 37 
+                            //                  7'b0010111 // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
+                            //                  7'b1101111 // JAL (Jump And Link) Spec. PDF-Page 39 )
+                            //                  7'b1100111 // JALR (Jump And Link Register) Spec. PDF-Page 39 
+                            (opcode == 0b1100011) // BRANCH (Comparasion and Branch) Spec. PDF-Page 40 )
+                            //                  7'b0000011 // LOAD (Load to Register) Spec. PDF-Page 42 )
+                        ||  (opcode == 0b0100011) // STORE (Store to Memory) Spec. PDF-Page 42 )
+                            //                  7'b0010011 // OP_IMM (Integer Register-Immediate Instructions) Spec. PDF-Page 36 )
+                        ||  (opcode == 0b0110011) // OP (Integer Register-Register Instructions) Spec. PDF-Page 37 )
+                        ;
+
+            bool need_rd =  (opcode == 0b0110111) // LUI (Load Upper Immediate) Spec. PDF-Page 37 
+                        ||  (opcode == 0b0010111) // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
+                        ||  (opcode == 0b1101111) // JAL (Jump And Link) Spec. PDF-Page 39 )
+                        ||  (opcode == 0b1100111)  // JALR (Jump And Link Register) Spec. PDF-Page 39 
+                        //||  (opcode == 0b1100011)  // BRANCH (Comparasion and Branch) Spec. PDF-Page 40 )
+                        ||  (opcode == 0b0000011)  // LOAD (Load to Register) Spec. PDF-Page 42 )
+                        //||  (opcode == 0b0100011)  // STORE (Store to Memory) Spec. PDF-Page 42 )
+                        ||  (opcode == 0b0010011)  // OP_IMM (Integer Register-Immediate Instructions) Spec. PDF-Page 36 )
+                        ||  (opcode == 0b0110011)  // OP (Integer Register-Register Instructions) Spec. PDF-Page 37 )
+                        ;
 
 
             unsigned reserved_id = 0;
+            for (unsigned i = 0; i < ENTRY_COUNT; i++)
+            {
+                if (entry_valid_reg[i].read() == 0 && reserved_id == 0)
+                {
+                    // find an open spot for next instruction
+                    reserved_id = i + 1;
+                    break;
+                }
+            }
+            // It's possible we can't find an open spot, let's wait and see whether any spot will be executed and get freed
+
+            unsigned executed_id = 0;
+            if (entry_valid_reg[issue_fifo_reg[0].read()].read() == 1 && entry_rs1_mark_reg[issue_fifo_reg[0].read()].read() == 0
+                && entry_rs2_mark_reg[issue_fifo_reg[0].read()].read() == 0)
+            {
+                executed_id = issue_fifo_reg[0].read();
+                if (reserved_id == 0)
+                {
+                    reserved_id = executed_id;
+                }
+                    //shift last four register
+                issue_fifo_next[0].write(issue_fifo_last_reg.read() == 1 ? reserved_id : issue_fifo_reg[1].read());// = last == 1 ? new : fifo[1]
+                issue_fifo_next[1].write(issue_fifo_last_reg.read() == 2 ? reserved_id : issue_fifo_reg[2].read());
+                issue_fifo_next[2].write(issue_fifo_last_reg.read() == 3 ? reserved_id : issue_fifo_reg[3].read());
+                issue_fifo_next[3].write(issue_fifo_last_reg.read() == 4 ? reserved_id : issue_fifo_reg[4].read());
+                    //fifo[1] = last == 2 ? new : fifo[2]
+                    //fifo[2] = last == 3 ? new : fifo[3]
+                    //fifo[3] = last == 4 ? new : fifo[4]
+            }
+            else if entry[fifo[1]] valid ready
+                execute
+                shift last three register
+                fifo[1] = last == 2 ? new : fifo[2]
+                fifo[2] = last == 3 ? new : fifo[3]
+                fifo[3] = last == 4 ? new : fifo[4]
+            else if entry[fifo[2]] valid ready
+                execute
+                shift last two register
+                fifo[2] = last == 3 ? new : fifo[3]
+                fifo[3] = last == 4 ? new : fifo[4]
+            else if entry[fifo[3]] valid ready
+                execute
+                shift last one register
+                fifo[3] = last == 4 ? new : fifo[4]
+            else if entry[fifo[4]] valid ready
+                execute
+                fifo[4] = new
+            else
+                none executed
+                if last == 5
+                    pause
+                else
+                    fifo[last] = new
+                    last++
+
+
+
+
+            unsigned reserved_id = 0;
+            unsigned executed_id = 0;
             for (unsigned i = 0; i < ENTRY_COUNT; i++)
             {
                 if (entry_valid_reg[i].read() == 0 && reserved_id == 0)
@@ -485,7 +587,8 @@ public:
                     reserved_id = 1 + i;
                 }
                 else if (entry_valid_reg[i].read() == 1 && entry_rs1_mark_reg[i].read() == 0
-                    && entry_rs2_mark_reg[i].read() == 0 && cdb_result_broadcasted.read() == 1)
+                    && entry_rs2_mark_reg[i].read() == 0 && cdb_result_broadcasted.read() == 1
+                    && executed_id == 0)
                 {
                     // this will be executed
                     entry_rs1_mark_next[i].write(entry_rs1_mark_reg[i].read());
@@ -496,6 +599,8 @@ public:
 
                     entry_valid_next[i].write(0);
                     entry_inst_next[i].write(entry_inst_reg[i].read());
+
+                    executed_id = 1 + i;
                 }
                 else
                 {
@@ -561,35 +666,35 @@ public:
                     rf_markerID_next[i].write(0);
                     rf_registers_next[i].write(0);
 
-                    if (rs1 == i)
+                    if (rs1 == i && need_rs1)
                     {
                         entry_rs1_mark_next[reserved_id - 1].write(0);
                         entry_rs1_next[reserved_id - 1].write(0);
                     }
-                    if (rs2 == i)
+                    if (rs2 == i && need_rs2)
                     {
                         entry_rs2_mark_next[reserved_id - 1].write(0);
                         entry_rs2_next[reserved_id - 1].write(0);
                     }
-                    if (rd == i)
+                    if (rd == i && need_rd)
                     {
                         // wirte to register zero have no effect
                     }
                 }
                 else if (rf_markerID_reg[i].read() != 0 && rf_markerID_reg[i].read() == cdb_com_ID.read())
                 {
-                    // ID matches and valid
-                    if (rs1 == i)
+                    // This register is waiting on data and Common data bus is boardcasting the data we are insterested in
+                    if (rs1 == i && need_rs1)
                     {
                         entry_rs1_mark_next[reserved_id - 1].write(0);
                         entry_rs1_next[reserved_id - 1].write(cdb_com_data.read());
                     }
-                    if (rs2 == i)
+                    if (rs2 == i && need_rs2)
                     {
                         entry_rs2_mark_next[reserved_id - 1].write(0);
                         entry_rs2_next[reserved_id - 1].write(cdb_com_data.read());
                     }
-                    if (rd == i)
+                    if (rd == i && need_rd)
                     {
                         // This register destination will be written by our instruction at this entry
                         rf_markerID_next[i].write(reserved_id);
@@ -603,8 +708,8 @@ public:
                 }
                 else
                 {
-                    // ID doesn't match or register not marked
-                    if (rs1 == i)
+                    // Common data bus is not boardcasting the data for this register right now
+                    if (rs1 == i && need_rs1)
                     {
                         if (rf_markerID_reg[i].read() != 0)
                         {
@@ -618,7 +723,7 @@ public:
                             entry_rs1_next[reserved_id - 1].write(rf_registers_reg[i].read());
                         }
                     }
-                    if (rs2 == i)
+                    if (rs2 == i && need_rs2)
                     {
                         if (rf_markerID_reg[i].read() != 0)
                         {
@@ -632,7 +737,7 @@ public:
                             entry_rs2_next[reserved_id - 1].write(rf_registers_reg[i].read());
                         }
                     }
-                    if (rd == i)
+                    if (rd == i && need_rd)
                     {
                         // This register destination will be written by our instruction at this entry
                         rf_markerID_next[i].write(reserved_id);
@@ -798,6 +903,8 @@ public:
     sc_vector < sc_in<unsigned> > entry_rs2_next; // real reigster value if unmarked, reservation entry ID if marked
     sc_vector < sc_in<unsigned> > entry_inst_next; // saved instruction
 
+    sc_vector < sc_out<unsigned> > fifo_reg;
+    sc_vector < sc_in<unsigned> > fifo_next;
     //Constructor
     SC_CTOR(reservation_station) : entry_valid_reg("entry_valid_reg", ENTRY_COUNT), entry_rs1_mark_reg("entry_rs1_mark_reg", ENTRY_COUNT),
         entry_rs2_mark_reg("entry_rs2_mark_reg", ENTRY_COUNT), entry_rs1_reg("entry_rs1_reg", ENTRY_COUNT), entry_rs2_reg("entry_rs2_reg", ENTRY_COUNT), 
@@ -805,7 +912,9 @@ public:
 
         entry_valid_next("entry_valid_next", ENTRY_COUNT), entry_rs1_mark_next("entry_rs1_mark_next", ENTRY_COUNT),
         entry_rs2_mark_next("entry_rs2_mark_next", ENTRY_COUNT), entry_rs1_next("entry_rs1_next", ENTRY_COUNT), entry_rs2_next("entry_rs2_next", ENTRY_COUNT),
-        entry_inst_next("entry_inst_next", ENTRY_COUNT) 
+        entry_inst_next("entry_inst_next", ENTRY_COUNT),
+
+        fifo_reg("fifo_reg", ENTRY_COUNT), fifo_next("fifo_next", ENTRY_COUNT)
     {
         SC_CTHREAD(entry, clk.pos());
 
@@ -841,6 +950,8 @@ public:
 
                 entry_inst[i] = entry_inst_next[i].read();
                 entry_inst_reg[i].write(entry_inst_next[i].read());
+
+                fifo_reg[i].write(fifo_next[i].read());
             }
         }
     }
@@ -942,6 +1053,9 @@ public:
             if (selected_entry_id == 0)
             {
                 // no entry is ready
+                // clear result, prevent other issuing instruction to see the old value
+                func_result_ID_next.write(0);
+                func_result_next.write(0);
                 continue;
             }
             
@@ -1317,6 +1431,9 @@ int sc_main(int, char* []) {
     sc_vector < sc_signal<unsigned> > issue_entry_rs2_next("ISSUE_ENTRY_RS2_NEXT", ENTRY_COUNT); // real reigster value if unmarked, reservation entry ID if marked
     sc_vector < sc_signal<unsigned> > issue_entry_inst_next("ISSUE_ENTRY_INST_NEXT", ENTRY_COUNT); // saved instruction
 
+    sc_vector < sc_signal<unsigned> > issue_fifo_reg("issue_fifo_reg", ENTRY_COUNT);
+    sc_vector < sc_signal<unsigned> > issue_fifo_next("issue_fifo_next", ENTRY_COUNT);
+
     new_control NCTRL("NEW_CONTROL");
     NCTRL.inst(new_control_inst);
     NCTRL.rst(rst);
@@ -1339,6 +1456,9 @@ int sc_main(int, char* []) {
     RS.entry_rs1_next(issue_entry_rs1_next); // real reigster value if unmarked, reservation entry ID if marked
     RS.entry_rs2_next(issue_entry_rs2_next); // real reigster value if unmarked, reservation entry ID if marked
     RS.entry_inst_next(issue_entry_inst_next); // saved instruction
+
+    RS.fifo_reg(issue_fifo_reg);
+    RS.fifo_next(issue_fifo_next);
 
     issue_combinational ISSUE_COM("ISSUE_COMBINATIONAL_LOGIC");
     ISSUE_COM.clk(clk);
@@ -1452,6 +1572,9 @@ int sc_main(int, char* []) {
         sc_trace(Tf, issue_entry_rs1_next[i], "issue_entry" + std::to_string(i) + "_rs1_next");
         sc_trace(Tf, issue_entry_rs2_next[i], "issue_entry" + std::to_string(i) + "_rs2_next");
         sc_trace(Tf, issue_entry_inst_next[i], "issue_entry" + std::to_string(i) + "_inst_next");
+
+        sc_trace(Tf, issue_fifo_reg[i], "issue_fifo" + std::to_string(i) + "_reg");
+        sc_trace(Tf, issue_fifo_next[i], "issue_fifo" + std::to_string(i) + "_next");
     }
     
     rst.write(1);

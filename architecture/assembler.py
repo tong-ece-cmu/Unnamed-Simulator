@@ -25,13 +25,16 @@ ADDI x1, x1, 2
 ADDI x1, x1, 1
 '''
 
-asem = p2
+
+# f = open('..\\HighLevelLanguageTests\\addition.assembly', "r")
+f = open('..\\HighLevelLanguageTests\\branch.assembly', "r")
+asem = f.read()
 
 # for each line
     # get list of tokens, split string on space and comma
     # convert all token except the first to number, register or immediate
     # switch on first token generate machine code
-    # print maching code
+    # print machine code
     
 import re
 

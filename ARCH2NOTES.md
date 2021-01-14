@@ -126,3 +126,114 @@ https://forums.accellera.org/topic/6004-sc_method-and-next_trigger-diagnostics/
 But next_trigger will complicate things. If we marked an register for destination. Then a common data bus signal comes in and overwrite that destination with data. Just because the event scheduler called the common data bus signal late. We then lost our mark on the destination and mess up all the insturction after it.
 
 It's better to have all combinational logic in one module.
+
+
+
+
+So, we have a big pile of code. Goal of the day to debug the code and pass as many test cases as possible. 
+
+1. The instructions from instruction fetch unit are all correct.                            CHECK.
+2. At 2ns, First Reservation station entry get proper instruction.  CHECK.
+3. At 2ns, First Reservation station entry get proper valid bit.    CHECK.
+4. At 2ns, First Reservation station entry get proper rs1 operand.  CHECK.
+5. At 2ns, First Reservation station entry get proper rs1 marker.   CHECK.
+6. At 2ns, First Reservation station entry get proper rs2 operand and marker.   CHECK.
+7. At 3ns, First entry get executed with proper ID and result.   CHECK.
+8. At 4ns, First entry get write back to register. CHECK.
+9. At 3ns, Second Reservation station entry get proper instruction. CHECK.
+10. At 3ns, second entry get proper valid bit, rs1, rs2 operand and marker. CHECK.
+11. At 4ns, second entry finished executing, recorded with proper ID(2) and result(3). CHECK.
+12. At 5ns, second entry finish writing back to register(write 3 to register 1). BAD.
+
+Actually, we are good. The register is now waiting for the result of the first entry again. Because first entry just got its next instruction and it's going to overwrite the second entry destination register. The reservation station of the first entry recorded the data on the common data bus.
+
+13. At 4ns, First entry get the third instruction. CHECK.
+14. At 4ns, First entry get proper valid bit, rs1, rs2 operand(2 and 0) and rs1, rs2 marker(1, 0). BAD.
+
+We don't need rs2 but our operand is still marked. It may halt the execution later. FIXED.
+
+15. At 5ns, First entry, third instruction finished executing, recorded with proper ID(1) and result(4). BAD.
+
+It didn't happen. Something is wrong. Actually, it's good. We are waiting on reservation station entry 2. And it just finished at 4ns and finished write back at 5ns. So right now, our operands are all unmarked.
+
+16. At 6ns, First entry, third instruction finished executing, recorded with proper ID(1) and result(4). CHECK.
+17. At 7ns, First entry, third instruction write back to proper reservation station entry(second entry). CHECK.
+
+18. At 5ns, Second entry get the forth instruction. CHECK.
+19. At 5ns, Second entry get proper valid bit, rs1, rs2 operand(1 and 0) and rs1, rs2 marker(1, 0). CHECK.
+20. At 7ns, Second entry get result from first entry. rs1(4) and unmarked. CHECK.
+21. At 8ns, Second entry forth instruction finished executing, recorded with proper ID(2) and result(6). BAD.
+
+Somehow the fifth instruction is executed before the forth instruction. At 4ns, the second entry finish executing the second instruction. At 5ns, function unit result didn't change, still holding second entry result, because first entry just got its data from common data bus. At 5ns, second entry got the forth instruction and told the register1 to wait on its data. But also at 5ns, the fifth instruction is issued and it needs register1. It sees register1 is waiting on second entry and common data bus is boardcasting second entry result, then everything is wrong. The fifth instruction mistakenly took the old value of the second entry. We need to clear function unit result when it's idling. 
+
+The result is still wrong. It's giving the first entry result, the first entry is on NOP, so result is zero. And the valid bit for the second entry is turned off. Found it, the issue logic assumed all valid entry will be executed, but in reality, only one entry will be executed. That's the reason the valid bit for second entry is off, even though it wasn't been executed.
+
+So at 8ns, the NOP in first entry gets executed first. In this architecture, the instructions in reservation station are executed base on their entry number. Lower entry number gets executed first. So this is expected. FIXED.
+
+22. At 9ns, Second entry forth instruction finished executing, recorded with proper ID(2) and result(6). CHECK.
+23. At 10ns, Second entry forth instruction write back to proper reservation station entry(third entry). CHECK.
+
+24. At 6ns, Third entry get the fifth instruction. CHECK.
+25. At 6ns, Third entry get proper valid bit, rs1, rs2 operand(2 and 0) and rs1, rs2 marker(1, 0). CHECK.
+26. At 10ns, Third entry get executed value from second entry. rs1(6). CHECK.
+27. At 11ns, Third entry fifth instruction finished executing, recorded with proper ID(3) and result(7). BAD.
+
+The function unit is permanently occupied with NOP in the first and the second entry. We can use some special NOP to force the NOP to wait on the last instruction. Or we can implement a some hardware to execute entries in first in first out order. Implement some hardware is the better choice here.
+
+We need know which entry to execute next. We can have a shift register, or a normal block of memory with looping index. Either way, we need some flip-flops to hold the history. Every cycle, we remove one instruction from the reservation station, and write-in a new instruction from the instruction fetch unit. Think of an array, there is a pointer points to the start of the FIFO and a pointer points to the end of the FIFO. To add, we write to the end of the FIFO and increment the end pointer. To remove, we read the start of the FIFO and increment the start pointer.
+
+Or we can have a shift register with end pointer. We write at the end and increment end pointer. We read at index zero and shift all memory and decrement end pointer. We will do this.
+
+Add five set of flip-flops, FIFO, maybe in the reservation station module. Add a set of flip-flops to record index. Each time an entry been populated with instruction, store entry number in FIFO at index and increment index. Actually, each cycle, we will execute one instruction and populate one instruction. Shift and write at the same time is difficult.
+
+Start over. We will have five set of flip-flops, FIFO. And two sets of flip-flops to record start and end index of FIFO. This won't work. We are actually not taking the start of the FIFO every time. Sometimes, we will take things in the middle. 
+
+Start over. Each entry will have a priority counter. Zero means lowest priority. Five means the highest priority. Each cycle, we will take the highest priority entry. Initially, the highest priority is zero. We put in one instruction, it will have priority one and the highest priority is one. We put in another instruction, it will have priotiry one and all other instructions get their priority incremented. And the highest priority increment as well. If we remove one instruction, all instruction that has lower priority get incremented. 
+
+
+if we are executing
+    put new entry in end pointer - 1
+    end point stay
+else
+    put new entry in end pointer
+    end pointer increment
+
+if reset
+    clear fifo
+    last = 0
+
+if entry[fifo[0]] valid and ready
+    execute
+    shift last four register
+    fifo[0] = last == 1 ? new : fifo[1]
+    fifo[1] = last == 2 ? new : fifo[2]
+    fifo[2] = last == 3 ? new : fifo[3]
+    fifo[3] = last == 4 ? new : fifo[4]
+else if entry[fifo[1]] valid ready
+    execute
+    shift last three register
+    fifo[1] = last == 2 ? new : fifo[2]
+    fifo[2] = last == 3 ? new : fifo[3]
+    fifo[3] = last == 4 ? new : fifo[4]
+else if entry[fifo[2]] valid ready
+    execute
+    shift last two register
+    fifo[2] = last == 3 ? new : fifo[3]
+    fifo[3] = last == 4 ? new : fifo[4]
+else if entry[fifo[3]] valid ready
+    execute
+    shift last one register
+    fifo[3] = last == 4 ? new : fifo[4]
+else if entry[fifo[4]] valid ready
+    execute
+    fifo[4] = new
+else
+    none executed
+    if last == 5
+        pause
+    else
+        fifo[last] = new
+        last ++
+
+
+
