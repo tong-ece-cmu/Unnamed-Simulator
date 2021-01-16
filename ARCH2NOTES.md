@@ -235,5 +235,19 @@ else
         fifo[last] = new
         last ++
 
+This is so complicated. How about we just change the order of checking instructions. So right now, start from entry0 to entry4, we check each to see whether it's valid and ready. If it is, we will execute it. This creates the problem if entry0 and entry1 are always valid and ready, we will stuck on executing those and never had a chance to execute other entry. The previous approach is to find which entry is the oldest entry and execute that first, it's complicated. In software, we need a priority heap, in hardware, it's non-trivial. Do we really need to do this to solve our problem? Our problem is execution stuck in entry0 and entry1. We will change the order we check those entries. Check 0-4, then 1-4-0, then 2-4-1, then 3-4-2, then 4-0-3, then 0-4.
 
+WOW, it worked. This is exciting. I think this scheme is synthesisable in hardware. We have an input and we want some output, not sure how will the combinational logic look like, but the hardware should be able to implement it. The next thing is to implement the load and store unit.
+
+# LOAD and Store Unit
+
+So the first set of Flip-flops store the instruction. After the rising clock edge, those flip-flops stores the instruction that needs to go in an reservation station at the next clock edge.
+
+Previously, we are just putting it into one of the ADD unit reservation station entries. We also read register file while at it. 
+
+Now, we need to account for the load and store unit. If it's an load or store instruction. We still need to read register file, this will probably take one cycle. Then we need to calculate the address, another cycle. Then we put it in the load and store buffer, which is fifo, another cycle. 
+
+The memory unit will have some sort of input. An address, read data, and write data. Also a valid bit, since memory will not give result in one clock cycle and it's not very predictable. The memory will have an array to store the data. There will be sets of flip-flops that stores the address, the write data, read signal, and write signal. At the positive clock edge, those things become available. We don't know what's actually going on in memory, we just want to model the delay. So there will be a state machine. If there read or write is high, start the delay, else stay in idle state. And record the address and write data. At the end of the delay, there will be a set of flip-flops to store the read data, and data valid bit. Can you pipeline a memory? Probably can, but we are not going to do it here.
+
+So the memory unit will have flip-flops for 
 
