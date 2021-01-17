@@ -249,5 +249,67 @@ Now, we need to account for the load and store unit. If it's an load or store in
 
 The memory unit will have some sort of input. An address, read data, and write data. Also a valid bit, since memory will not give result in one clock cycle and it's not very predictable. The memory will have an array to store the data. There will be sets of flip-flops that stores the address, the write data, read signal, and write signal. At the positive clock edge, those things become available. We don't know what's actually going on in memory, we just want to model the delay. So there will be a state machine. If there read or write is high, start the delay, else stay in idle state. And record the address and write data. At the end of the delay, there will be a set of flip-flops to store the read data, and data valid bit. Can you pipeline a memory? Probably can, but we are not going to do it here.
 
-So the memory unit will have flip-flops for 
+So the memory unit will have flip-flops for receiving the read result from register. Next cycle, the result will be calculated and put into fifo buffer. Next cycle, the fifo buffer will present one instruction to the memory unit.
+
+The memory unit will start the state machine if it detects a read or write, move away from the idle state at the next clock edge. Wait until it start loading data. It will start reading or writing to the data array. At the last clock edge, it read or write the last byte of data, and put the valid bit to high, to signal read complete or write complete. 
+
+The load and store unit will have two sets of flip-flops. One for storing read result from register file. One for storing the memory address execution results. The second set will actually have five entries, so it can store five load and store instructions that's going to be executed when memory module is available. To make it simple, we are going to say we can accomandate five instructions. So that's five new ID for register file and reservation station to keep track of. 
+
+Actually, it's possible that our source operands aren't available at the issue stage. But read and write out of order is not that trivial. We will leave it for now.
+
+We need a shift register to implement the fifo. We need an ID generator to issue ID to the register file marker. The calculation of memory address needs to wait until its source operand is valid, or broadcasted on CDB. 
+
+If there is a load and store. Check whether we have space in fifo. If there are space, get an ID, send that ID to register file. Read register file and send it to flip-flop. We will have a counter that keeps track of the end of fifo. If that is five, then we are full, else we have space. While reading the operand, increment the counter.
+
+Next clock cycle if we have the operand ready, then we calculate the address and present it to the fifo. If not ready, we check the CDB, if that shows the data we needed, calculate. Else, if CDB only provide one operand, save it, else wait for next cycle. Put the busy flag while we are waiting. Can't take load or store instruction right now. 
+
+Next clock cycle, if execution result is valid, put it in the fifo, at index counter - 1. 
+
+
+Present the adress and data to the memory unit. At the clock edge, if counter is zero, do nothing, else if counter is one, check if counter is greater than zero. Then start reading the memory stored in index zero of the fifo. 
+
+Next cycle, put the result in the result flip-flop, along with the valid bit. The CDB will handle it from there. Then shift the fifo for the next instruction. 
+
+
+# Load an Store Unit Implementation Notes
+Currently, the Add unit is taking all the instructions, that includes the load and store instruction. That's not right. The instructions are issued in the issue_combinational module. If the instuction is not a load or store instruction, put it in one of the instruction unit. 
+
+Don't worry about delay for now. Assume the memory will get the data at the next clock edge. Make sure everything else is working, CDB, register file read and write.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Off the side idea
+How about self-reconfigurable cache. Use LUT to control passgate which controls the wire for the cache address decoder. We can shift the tag field, index, and block offset field around. And change the configuration of the cache on the fly. Before each reconfiguration, we need to flush the cache, because the old address system is gone. We can monitor the cache access to change configuration on the fly. If we have 4kB cache, we monitor the recent 4kB access pattern. If they are all the same, then modify our cache configuration to optimize cache access. Keep track of which address bit changes the most, then put those into the block offset field.
+
+
+
 

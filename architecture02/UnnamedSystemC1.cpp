@@ -319,10 +319,9 @@ public:
 
         /*pc = 0;*/
         instructions = {
-            0x00300093,
-            0x00108093,
-            0x00208093,
-            0x00108093
+            0x00400093,
+            0x00102023,
+            0x00002103
         };
     }
 
@@ -412,6 +411,12 @@ public:
 
     sc_in<unsigned> issue_fifo_last_reg;
     sc_out<unsigned> issue_fifo_last_next;
+
+    sc_in<unsigned>    ls_available_id;
+    sc_out<unsigned>   ls_operand1;
+    sc_out<bool>       ls_operand1_marked;
+    sc_out<unsigned>   ls_operand2;
+    sc_out<bool>       ls_operand2_marked;
 
     //Constructor
     SC_CTOR(issue_combinational) : entry_valid_reg("entry_valid_reg", ENTRY_COUNT), entry_rs1_mark_reg("entry_rs1_mark_reg", ENTRY_COUNT),
@@ -507,6 +512,9 @@ public:
                         ||  (opcode == 0b0110011)  // OP (Integer Register-Register Instructions) Spec. PDF-Page 37 )
                         ;
 
+            bool is_load_store =    (opcode == 0b0000011)  // LOAD (Load to Register) Spec. PDF-Page 42 )
+                                ||  (opcode == 0b0100011);  // STORE (Store to Memory) Spec. PDF-Page 42 )
+
             issue_fifo_last_next.write((issue_fifo_last_reg.read()+1) % ENTRY_COUNT);
 
             unsigned reserved_id = 0;
@@ -514,9 +522,9 @@ public:
             unsigned i = issue_fifo_last_reg.read();
             for (unsigned ic = 0; ic < ENTRY_COUNT; ic++)
             {
-                if (reserved_id == 0 && entry_valid_reg[i] == 0)
+                if (reserved_id == 0 && entry_valid_reg[i] == 0 && !is_load_store)
                 {
-                    // this spot is open and we are actually looking for a spot
+                    // this spot is open and we are actually looking for a spot and it's not load or store
                     // we will use this spot and start filling info next
 
                     // those will come from register file logic
@@ -583,6 +591,11 @@ public:
                 i = (i + 1) % ENTRY_COUNT;
             }
 
+            if (is_load_store)
+            {
+                reserved_id = ls_available_id.read();
+            }
+
             if (reserved_id == 0)
             {
                 // we didn't get a spot, pause instruction
@@ -605,13 +618,29 @@ public:
 
                     if (rs1 == i && need_rs1)
                     {
-                        entry_rs1_mark_next[reserved_id - 1].write(0);
-                        entry_rs1_next[reserved_id - 1].write(0);
+                        if (reserved_id >= 6)
+                        {
+                            ls_operand1_marked.write(false);
+                            ls_operand1.write(0);
+                        }
+                        else 
+                        {
+                            entry_rs1_mark_next[reserved_id - 1].write(0);
+                            entry_rs1_next[reserved_id - 1].write(0);
+                        }
                     }
                     if (rs2 == i && need_rs2)
                     {
-                        entry_rs2_mark_next[reserved_id - 1].write(0);
-                        entry_rs2_next[reserved_id - 1].write(0);
+                        if (reserved_id >= 6)
+                        {
+                            ls_operand2_marked.write(false);
+                            ls_operand2.write(0);
+                        }
+                        else
+                        {
+                            entry_rs2_mark_next[reserved_id - 1].write(0);
+                            entry_rs2_next[reserved_id - 1].write(0);
+                        }
                     }
                     if (rd == i && need_rd)
                     {
@@ -623,13 +652,29 @@ public:
                     // This register is waiting on data and Common data bus is boardcasting the data we are insterested in
                     if (rs1 == i && need_rs1)
                     {
-                        entry_rs1_mark_next[reserved_id - 1].write(0);
-                        entry_rs1_next[reserved_id - 1].write(cdb_com_data.read());
+                        if (reserved_id >= 6)
+                        {
+                            ls_operand1_marked.write(false);
+                            ls_operand1.write(cdb_com_data.read());
+                        }
+                        else
+                        {
+                            entry_rs1_mark_next[reserved_id - 1].write(0);
+                            entry_rs1_next[reserved_id - 1].write(cdb_com_data.read());
+                        }
                     }
                     if (rs2 == i && need_rs2)
                     {
-                        entry_rs2_mark_next[reserved_id - 1].write(0);
-                        entry_rs2_next[reserved_id - 1].write(cdb_com_data.read());
+                        if (reserved_id >= 6)
+                        {
+                            ls_operand2_marked.write(false);
+                            ls_operand2.write(cdb_com_data.read());
+                        }
+                        else
+                        {
+                            entry_rs2_mark_next[reserved_id - 1].write(0);
+                            entry_rs2_next[reserved_id - 1].write(cdb_com_data.read());
+                        }
                     }
                     if (rd == i && need_rd)
                     {
@@ -651,13 +696,29 @@ public:
                         if (rf_markerID_reg[i].read() != 0)
                         {
                             // we need to wait for other reservation station to finish
-                            entry_rs1_mark_next[reserved_id - 1].write(1);
-                            entry_rs1_next[reserved_id - 1].write(rf_markerID_reg[i].read());
+                            if (reserved_id >= 6)
+                            {
+                                ls_operand1_marked.write(true);
+                                ls_operand1.write(rf_markerID_reg[i].read());
+                            }
+                            else
+                            {
+                                entry_rs1_mark_next[reserved_id - 1].write(1);
+                                entry_rs1_next[reserved_id - 1].write(rf_markerID_reg[i].read());
+                            }
                         }
                         else
                         {
-                            entry_rs1_mark_next[reserved_id - 1].write(0);
-                            entry_rs1_next[reserved_id - 1].write(rf_registers_reg[i].read());
+                            if (reserved_id >= 6)
+                            {
+                                ls_operand1_marked.write(false);
+                                ls_operand1.write(rf_registers_reg[i].read());
+                            }
+                            else
+                            {
+                                entry_rs1_mark_next[reserved_id - 1].write(0);
+                                entry_rs1_next[reserved_id - 1].write(rf_registers_reg[i].read());
+                            }
                         }
                     }
                     if (rs2 == i && need_rs2)
@@ -665,13 +726,29 @@ public:
                         if (rf_markerID_reg[i].read() != 0)
                         {
                             // we need to wait for other reservation station to finish
-                            entry_rs2_mark_next[reserved_id - 1].write(1);
-                            entry_rs2_next[reserved_id - 1].write(rf_markerID_reg[i].read());
+                            if (reserved_id >= 6)
+                            {
+                                ls_operand2_marked.write(true);
+                                ls_operand2.write(rf_markerID_reg[i].read());
+                            }
+                            else
+                            {
+                                entry_rs2_mark_next[reserved_id - 1].write(1);
+                                entry_rs2_next[reserved_id - 1].write(rf_markerID_reg[i].read());
+                            }
                         }
                         else
                         {
-                            entry_rs2_mark_next[reserved_id - 1].write(0);
-                            entry_rs2_next[reserved_id - 1].write(rf_registers_reg[i].read());
+                            if (reserved_id >= 6)
+                            {
+                                ls_operand2_marked.write(false);
+                                ls_operand2.write(rf_registers_reg[i].read());
+                            }
+                            else
+                            {
+                                entry_rs2_mark_next[reserved_id - 1].write(0);
+                                entry_rs2_next[reserved_id - 1].write(rf_registers_reg[i].read());
+                            }
                         }
                     }
                     if (rd == i && need_rd)
@@ -1167,6 +1244,183 @@ public:
     }
 };
 
+class load_store_module : sc_module
+{
+private:
+    unsigned counter;
+    std::vector<unsigned> memory;
+    unsigned MEM_SIZE = 64;
+    unsigned saved_inst;
+    bool saved_inst_valid;
+    unsigned saved_operand1;
+    bool saved_operand1_marked;
+    unsigned saved_operand2;
+    bool saved_operand2_marked;
+
+    bool mem_ready_for_input;
+
+    unsigned mem_read_result;
+    unsigned mem_data_id;
+    bool mem_result_ready;
+public:
+    //sc_in<bool>  			rst;    	// reset
+    sc_in_clk 			clk;
+
+    //sc_out<bool>        fifo_not_full;
+    sc_out<unsigned>    available_id;
+
+    sc_in<unsigned> 	inst;  	    // instruction output
+    //sc_in<bool> 	    inst_valid;  	    // instruction output
+    sc_in<unsigned>     operand1;
+    sc_in<bool>         operand1_marked;
+    sc_in<unsigned>     operand2;
+    sc_in<bool>         operand2_marked;
+
+    //sc_out<unsigned>    rd_data;
+    //sc_in<unsigned>     wr_data;
+
+    sc_out<bool>    is_waiting_pause;
+
+    sc_in<unsigned> com_data;
+    sc_in<unsigned> com_ID;
+    /*sc_out<unsigned> 		addr, wr_data;
+    sc_out<bool> 		rd, wr, valid;
+
+    sc_out<unsigned> 		rd_data;
+    sc_in<bool> 		rd, wr, valid;*/
+
+    //Constructor
+    SC_CTOR(load_store_module) {
+        //SC_CTHREAD(entry, clk.pos());
+        SC_METHOD(entry)
+        sensitive << clk.pos();
+
+        SC_METHOD(entry_CDB)
+        sensitive << com_data << com_ID;
+        counter = 0;
+        memory = std::vector<unsigned>(MEM_SIZE, 0);
+    }
+
+    void combinational_process() {
+        
+        unsigned instv = saved_inst;
+        unsigned opcode = instv & 0x7F;
+        unsigned L_immediate = instv >> 20 & 0xFFF;
+        unsigned S_immediate = (instv >> 25 & 0x7F) << 5 | (instv >> 7 & 0x1F);
+        switch (opcode)
+        {
+        case 0b0000011: // LOAD (Load to Register) Spec. PDF-Page 42 )
+            mem_read_result = memory[saved_operand1 + L_immediate];
+            mem_data_id = 6;
+            mem_result_ready = true;
+            is_waiting_pause.write(false);
+            break;
+        case 0b0100011: // STORE (Store to Memory) Spec. PDF-Page 42 )
+            memory[saved_operand1 + S_immediate] = saved_operand2;
+            mem_data_id = 0;
+            mem_result_ready = true;
+            is_waiting_pause.write(false);
+            break;
+        default:
+            cout << "************* BAD OPCODE - LOAD STORE UNIT *************" << endl;
+            cout << "    opcode:" << std::hex << opcode << std::dec << endl;
+            break;
+        }
+
+    }
+
+    void entry_CDB() {
+        if (saved_inst_valid)
+        {
+            if (saved_operand1_marked && com_ID.read() == saved_operand1)
+            {
+                // operand1 is broadcasted on CDB
+                saved_operand1 = com_data.read();
+                saved_operand1_marked = false;
+            }
+
+            if (saved_operand2_marked && com_ID.read() == saved_operand2)
+            {
+                // operand2 is broadcasted on CDB
+                saved_operand2 = com_data.read();
+                saved_operand2_marked = false;
+            }
+
+            if (!saved_operand1_marked && !saved_operand2_marked)
+            {
+                // both unmarked, ready for execution
+                combinational_process();
+            }
+        }
+    }
+    // Process functionality in member function below
+    void entry() {
+        if (mem_result_ready)
+        {
+            unsigned mem_read_result;
+            unsigned mem_data_id;
+            mem_result_ready = false;
+        }
+        if ((inst.read() & 0x7F) == 0b0000011 || (inst.read() & 0x7F) == 0b0100011)
+        {
+            // It's a load or store instruction, let's get to work
+            saved_inst = inst.read();
+            saved_inst_valid = true;
+            saved_operand1 = operand1.read();
+            saved_operand1_marked = operand1_marked.read();
+            saved_operand2 = operand2.read();
+            saved_operand2_marked = operand2_marked.read();
+
+            if (!saved_operand1_marked && !saved_operand2_marked)
+            {
+                // both unmarked, ready for execution
+                combinational_process();
+            }
+            else
+            {
+                is_waiting_pause.write(true);
+            }
+                
+        }
+
+        //fifo_not_full.write(true);
+        available_id.write(counter+6);
+
+        
+
+    }
+};
+
+class check_sensitivity : sc_module
+{
+private:
+
+public:
+    //sc_in<bool>  			rst;    	// reset
+    //sc_out<unsigned> 		inst;  	    // instruction output
+    sc_in_clk 			clk;
+
+    //Constructor
+    SC_CTOR(check_sensitivity) {
+        //SC_CTHREAD(entry, clk.pos());
+        SC_METHOD(entry)
+        sensitive << clk.pos();
+
+        SC_METHOD(entryN)
+        sensitive << clk.neg();
+    }
+
+    void entryN() {
+        cout << "neg edge" << endl;
+    }
+
+    // Process functionality in member function below
+    void entry() {
+        cout << "pos edge" << endl;
+
+    }
+};
+
 class your_module : sc_module 
 {
 private:
@@ -1227,6 +1481,14 @@ int sc_main(int, char* []) {
 
     sc_signal<unsigned> cdb_com_data;
     sc_signal<unsigned> cdb_com_ID;
+
+    //// ************************ Load Store Unit ***********************************
+    sc_signal<unsigned> ls_available_id("ls_available_id");
+    sc_signal<unsigned> ls_operand1("ls_operand1");
+    sc_signal<bool> ls_operand1_marked("ls_operand1_marked");
+    sc_signal<unsigned> ls_operand2("ls_operand2");
+    sc_signal<bool> ls_operand2_marked("ls_operand2_marked");
+    sc_signal<bool> ls_is_waiting_pause("ls_is_waiting_pause");
 
     sc_clock clk("Clock", 1, SC_NS, 0.5, 0.0, SC_NS); // 1ns period, 0.5 duty cycle, start at 0ns
 
@@ -1327,6 +1589,12 @@ int sc_main(int, char* []) {
     ISSUE_COM.issue_fifo_last_reg(issue_fifo_last_reg);
     ISSUE_COM.issue_fifo_last_next(issue_fifo_last_next);
 
+    ISSUE_COM.ls_available_id(ls_available_id);
+    ISSUE_COM.ls_operand1(ls_operand1);
+    ISSUE_COM.ls_operand1_marked(ls_operand1_marked);
+    ISSUE_COM.ls_operand2(ls_operand2);
+    ISSUE_COM.ls_operand2_marked(ls_operand2_marked);
+
     function_result FR("FUNCTION_RESULTS");
     FR.rst(rst);    	// reset
     FR.clk(clk);
@@ -1369,6 +1637,21 @@ int sc_main(int, char* []) {
     CDB_COM.com_data(cdb_com_data);
     CDB_COM.com_ID(cdb_com_ID);
 
+
+    load_store_module LS("LOAD_STORE_MODULE");
+    LS.clk(clk);
+    LS.available_id(ls_available_id);
+    LS.inst(new_control_inst);  	    // instruction output
+    LS.operand1(ls_operand1);
+    LS.operand1_marked(ls_operand1_marked);
+    LS.operand2(ls_operand2);
+    LS.operand2_marked(ls_operand2_marked);
+    LS.is_waiting_pause(ls_is_waiting_pause);
+    LS.com_data(cdb_com_data);
+    LS.com_ID(cdb_com_ID);
+
+    //check_sensitivity CS("CHECK_SENSITIVITY");
+    //CS.clk(clk);
 
     sc_trace_file* Tf;
     Tf = sc_create_vcd_trace_file("traces");
