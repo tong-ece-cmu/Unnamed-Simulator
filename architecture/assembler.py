@@ -83,7 +83,7 @@ LW x2, x0, 0
 # f = open('..\\HighLevelLanguageTests\\branch.assembly', "r")
 # asem = f.read()
 
-asem = p3
+asem = p2
 
 # for each line
     # get list of tokens, split string on space and comma

@@ -277,7 +277,11 @@ Currently, the Add unit is taking all the instructions, that includes the load a
 Don't worry about delay for now. Assume the memory will get the data at the next clock edge. Make sure everything else is working, CDB, register file read and write.
 
 
+We need to put combinational logic and sequential logic into seperate module. The first flip-flops hold the result of the register reads. The input that goes into the first flip-flop will depends on the common data bus and register file read.
 
+The execute combinational logic will check whether the operands are ready and put the executed result into the result flip-flops.
+
+I decided to not finish load and store unit, and switch to System Verilog. I revert the changes and this model passes the test cases for four consecutive ADDI instructions.
 
 
 

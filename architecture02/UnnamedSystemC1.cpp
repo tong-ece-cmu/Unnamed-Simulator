@@ -319,9 +319,10 @@ public:
 
         /*pc = 0;*/
         instructions = {
-            0x00400093,
-            0x00102023,
-            0x00002103
+            0x00300093,
+            0x00108093,
+            0x00208093,
+            0x00108093
         };
     }
 
@@ -1638,17 +1639,17 @@ int sc_main(int, char* []) {
     CDB_COM.com_ID(cdb_com_ID);
 
 
-    load_store_module LS("LOAD_STORE_MODULE");
-    LS.clk(clk);
-    LS.available_id(ls_available_id);
-    LS.inst(new_control_inst);  	    // instruction output
-    LS.operand1(ls_operand1);
-    LS.operand1_marked(ls_operand1_marked);
-    LS.operand2(ls_operand2);
-    LS.operand2_marked(ls_operand2_marked);
-    LS.is_waiting_pause(ls_is_waiting_pause);
-    LS.com_data(cdb_com_data);
-    LS.com_ID(cdb_com_ID);
+    //load_store_module LS("LOAD_STORE_MODULE");
+    //LS.clk(clk);
+    //LS.available_id(ls_available_id);
+    //LS.inst(new_control_inst);  	    // instruction output
+    //LS.operand1(ls_operand1);
+    //LS.operand1_marked(ls_operand1_marked);
+    //LS.operand2(ls_operand2);
+    //LS.operand2_marked(ls_operand2_marked);
+    //LS.is_waiting_pause(ls_is_waiting_pause);
+    //LS.com_data(cdb_com_data);
+    //LS.com_ID(cdb_com_ID);
 
     //check_sensitivity CS("CHECK_SENSITIVITY");
     //CS.clk(clk);
@@ -1670,6 +1671,11 @@ int sc_main(int, char* []) {
     sc_trace(Tf, cdb_result_broadcasted, "cdb_result_broadcasted");
     sc_trace(Tf, cdb_com_data, "cdb_com_data");
     sc_trace(Tf, cdb_com_ID, "cdb_com_ID");
+
+    /*sc_trace(Tf, ls_operand1, "ls_operand1");
+    sc_trace(Tf, ls_operand1_marked, "ls_operand1_marked");
+    sc_trace(Tf, ls_operand2, "ls_operand2");
+    sc_trace(Tf, ls_operand2_marked, "ls_operand2_marked");*/
 
     for (unsigned i = 0; i < REGISTER_COUNT; i++)
     {
