@@ -21,3 +21,12 @@ At the fourth clock edge. Memory read results ready. Or the execution result if 
 In the period after, write results to register file.
 
 # Memory 
+
+# Off the side notes
+Try ModelSim PE SE, it has assertion support, supposetly better than vivado simulator.
+
+https://www.mentor.com/company/higher_ed/modelsim-student-edition
+
+temporal logic assertions
+
+jaspergold formal verification
