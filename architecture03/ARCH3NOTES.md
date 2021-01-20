@@ -23,7 +23,7 @@ In the period after, write results to register file.
 # Memory 
 
 # Off the side notes
-Try ModelSim PE SE, it has assertion support, supposetly better than vivado simulator.
+Try ModelSim PE SE, it has assertion support, supposedly better than Vivado simulator.
 
 https://www.mentor.com/company/higher_ed/modelsim-student-edition
 
