@@ -1,6 +1,6 @@
 # Unnamed CPU Simulator [![GitHub issues](https://img.shields.io/github/issues/tong-ece-cmu/Unnamed-Simulator)](https://github.com/tong-ece-cmu/Unnamed-Simulator/issues) [![GitHub forks](https://img.shields.io/github/forks/tong-ece-cmu/Unnamed-Simulator)](https://github.com/tong-ece-cmu/Unnamed-Simulator/network) [![GitHub stars](https://img.shields.io/github/stars/tong-ece-cmu/Unnamed-Simulator)](https://github.com/tong-ece-cmu/Unnamed-Simulator/stargazers)
 
-Here stores all the CPU designs I made. Experimenting with different hardware description languages, Verilog, System C, and System Verilog. Trying out different microarchitectures. 
+Here stores different CPU designs and their design notes; Experiments with different hardware description languages, Verilog, System C, and System Verilog; Experiments with different hardware design techniques, data forwarding, automated verification, etc. 
 
 ## Microarchitectures (Latest & Greatest on the top)
 
