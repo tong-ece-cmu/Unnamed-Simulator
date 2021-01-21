@@ -32,12 +32,18 @@ module main(
     // Execute Datapath
     wire [31:0] exe_inst, exe_result;
     wire [1:0] exe_rs1_forward, exe_rs2_forward;
-    // Data Memory
+    // Cache
     wire [31:0] mem_result, mem_inst, mem_addr;
     wire freeze_cpu;
     // Write Back
     wire [31:0] write_back_inst;
     
+    // DRAM
+    wire dram_ready;
+    wire [31:0] dram_result;
+    wire [1:0] dram_signal;
+    wire [31:0] dram_addr;
+    wire [31:0] dram_write_data;
     
     wire[31:0] inst, PC;
     
@@ -45,27 +51,23 @@ module main(
     RegisterFile register_module(.*);
     InstructionDecode instruction_decode_module(.*);
     Execute execute_module(.*);
-    Data_Memory data_memory_module(.*);
+    Cache cache_module(.*);
     Write_Back_Control write_back_control_module(.*);
+    
+    DRAM dram_module(.*);
+//    Data_Memory data_memory_module(.*);
     
     initial
     begin
-        `include "verification.vh"
+        
         clk <= 0;
         rst <= 1;
         #10 rst <= 0;
         
+        `include "verification.vh"
         #`SIMULATION_FINISH_TIME $finish;            // Quit the simulation
         
-        
-//    immediate_assertion_name:              // assertion name
-//    assert (imem[0] == 44)        // expression to be checked
-//    else                               // (optional) custom error message
-//        $error("%m checker failed");
-        if (instruction_memory_module.imem[0] != 44)
-            $error("%m checker failed");
-        end
-        
+    end
     
 endmodule : main
 

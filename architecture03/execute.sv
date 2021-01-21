@@ -144,10 +144,12 @@ begin
 	    end
 	    
 	    else if (funct3 == 3'b110) // OR (OR)
-	       exe_result_next <= rs1_data | rs2_data;
+	       exe_result_next = rs1_data | rs2_data;
 	    else if (funct3 == 3'b111) // AND (AND)
-	       exe_result_next <= rs1_data & rs2_data;	    
+	       exe_result_next = rs1_data & rs2_data;	    
     end
+    else
+        exe_result_next = 0;
 end
 
 always_comb begin

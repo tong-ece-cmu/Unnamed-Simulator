@@ -1,4 +1,5 @@
-# Unnamed CPU Simulator [![GitHub issues](https://img.shields.io/github/issues/tong-ece-cmu/Unnamed-Simulator)](https://github.com/tong-ece-cmu/Unnamed-Simulator/issues) [![GitHub forks](https://img.shields.io/github/forks/tong-ece-cmu/Unnamed-Simulator)](https://github.com/tong-ece-cmu/Unnamed-Simulator/network) [![GitHub stars](https://img.shields.io/github/stars/tong-ece-cmu/Unnamed-Simulator)](https://github.com/tong-ece-cmu/Unnamed-Simulator/stargazers)
+# Unnamed CPU Simulator [![GitHub issues](https://img.shields.io/github/issues/tong-ece-cmu/Unnamed-Simulator)](https://github.com/tong-ece-cmu/Unnamed-Simulator/issues) [![GitHub forks](https://img.shields.io/github/forks/tong-ece-cmu/Unnamed-Simulator)](https://github.com/tong-ece-cmu/Unnamed-Simulator/network) [![GitHub stars](https://img.shields.io/github/stars/tong-ece-cmu/Unnamed-Simulator)](https://github.com/tong-ece-cmu/Unnamed-Simulator/stargazers) [![This Repository uses a generated Social Preview from @pqt/social-preview](https://img.shields.io/badge/%E2%9C%93-Social%20Preview-blue)](https://github.com/pqt/social-preview)
+
 
 Here stores different CPU designs and their design notes; Experiments with different hardware description languages, Verilog, System C, and System Verilog; Experiments with different hardware design techniques, data forwarding, automated verification, etc. 
 
@@ -8,8 +9,8 @@ Here stores different CPU designs and their design notes; Experiments with diffe
 
 - [Completed] Data forwarding
 - [Completed] Memory module with delay
-- [Happening] Automated Assertion Verification
-- [TODO] 4kB Cache
+- [Completed] Automated Assertion Test Cases Checking
+- [Happening] 4kB Cache
 - [TODO] Dual Core
 
 
@@ -30,5 +31,7 @@ Here stores different CPU designs and their design notes; Experiments with diffe
 There are readme files and sometimes development notes for each architecture in their folder. Check the md files.
 
 All architectures adhere to RISC-V Instruction Set Architecture.
+
+The tests are not comprehensive, they are not suppose to be at this early stage. I use them to make sure the functionality I tried to implement is actually working. After things get serious, I will create some elaborated tests to make sure everything will work flawlessly.
 
 

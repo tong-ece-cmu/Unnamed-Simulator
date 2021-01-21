@@ -19,6 +19,188 @@
 // 
 //////////////////////////////////////////////////////////////////////////////////
 
+
+module Cache (
+input clk,
+input rst,
+input [31:0] mem_inst,
+input [31:0] exe_result, mem_addr,
+input dram_ready,
+input [31:0] dram_result,
+output logic [1:0] dram_signal,
+output [31:0] dram_addr,
+output [31:0] dram_write_data,
+output reg [31:0] mem_result,
+output reg [31:0] write_back_inst,
+output logic freeze_cpu
+);
+
+// 4KiB cache, 4 bytes a word
+// 4KiB cache, 4 bytes a word, 1024 word
+reg [31:0] data [1023:0];
+
+// 4KiB cache, 32 bytes block size, each block 8 words
+// 32 bytes block size, each block 8 words
+// 4KiB cache, 128 blocks
+// 32 bit address, 5 bit block offset, 7 bit cache index, 20 bit tag
+reg [19:0] tags [127:0];
+reg [127:0] valid;
+logic [127:0] valid_next;
+wire is_load_store;
+wire [6:0] index_field = mem_addr[11:5];
+wire [19:0] tag_field = mem_addr[31:12];
+wire [11:0] offset_field = mem_addr[4:0];
+logic [31:0] mem_result_next;
+logic [31:0] write_back_inst_next;
+
+assign dram_addr = mem_addr;
+assign dram_write_data = exe_result;
+//----
+
+localparam SIG_IDLE = 0, SIG_READ = 1, SIG_WRITE = 2;
+
+
+
+assign is_load_store = mem_inst[6:0] == 7'b0000011 || mem_inst[6:0] == 7'b0100011;
+
+
+
+// ------------------------ Freeze CPU and Memory Result ------------------------ 
+always_comb begin
+    if (is_load_store)
+    begin
+        if (valid[index_field] && tags[index_field] == tag_field) 
+        begin // cache hit
+            freeze_cpu = 0; 
+            mem_result_next = data[{index_field, offset_field}];
+        end
+        else
+        begin // cache miss
+            if (dram_ready == 0) // DRAM is fetching
+            begin
+                freeze_cpu = 1;
+                mem_result_next = mem_result;
+            end
+            else    // DRAM fetch complete
+            begin
+                freeze_cpu = 0;
+                mem_result_next = dram_result;
+            end
+        end
+    end
+    else
+    begin
+        freeze_cpu = 0;
+        mem_result_next = exe_result;
+    end
+end
+
+
+// ------------------------ DRAM signals ------------------------ 
+always_comb begin
+    if (is_load_store)
+    begin
+        if (valid[index_field] && tags[index_field] == tag_field) 
+        begin
+            dram_signal = SIG_IDLE;
+        end
+        else
+            dram_signal = mem_inst[6:0] == 7'b0000011 ? SIG_READ : SIG_WRITE; // LOAD is read
+    end
+    else
+        dram_signal = SIG_IDLE;
+end
+
+
+always_comb begin
+    if (rst)
+        valid_next = 0;
+    else
+        valid_next = valid;
+end
+
+always_comb begin
+    if (freeze_cpu)     write_back_inst_next = write_back_inst;
+    else                write_back_inst_next = mem_inst;
+end
+
+always_ff @(posedge clk) begin
+    valid <= valid_next;
+    mem_result <= mem_result_next;
+    write_back_inst <= write_back_inst_next;
+end
+
+endmodule : Cache
+
+module DRAM (
+input clk,
+input rst,
+input logic [1:0] dram_signal,
+input [31:0] dram_addr,
+input [31:0] dram_write_data,
+output dram_ready,
+output logic [31:0] dram_result
+);
+localparam SIG_IDLE = 0, SIG_READ = 1, SIG_WRITE = 2;
+//parameter LATENCY = 20;
+parameter LATENCY = 4;
+reg [31:0] dmem [63:0];
+reg [7:0] delay_counter;
+logic [7:0] delay_counter_next;
+
+wire is_read_write = dram_signal == SIG_READ || dram_signal == SIG_WRITE;
+wire dram_busy = is_read_write && delay_counter != LATENCY;
+assign dram_ready = !dram_busy;
+
+logic [31:0] dram_write_next;
+
+always_comb begin
+    if (delay_counter == LATENCY && dram_signal == SIG_WRITE)
+        dram_write_next = dram_write_data;
+    else
+        dram_write_next = dmem[dram_addr];
+end
+
+always_comb begin
+    if (delay_counter == LATENCY && dram_signal == SIG_READ)
+        dram_result = dmem[dram_addr];
+    else
+        dram_result = 0;
+end
+
+always_comb begin
+    if (rst) begin
+        delay_counter_next = 0;
+    end
+    else if (delay_counter == 0) begin
+        if (dram_signal == SIG_READ || dram_signal == SIG_WRITE) begin
+            delay_counter_next = 1;
+        end
+        else begin
+            delay_counter_next = 0;
+        end
+    end
+    else if (delay_counter > 0 && delay_counter < LATENCY) begin
+        delay_counter_next = delay_counter + 1;
+    end
+    else if (delay_counter == LATENCY) begin
+         delay_counter_next = 0;
+    end
+    else begin
+        delay_counter_next = 0;
+    end
+end
+
+always_ff @(posedge clk) begin
+    delay_counter <= delay_counter_next;
+    dmem[dram_addr] <= dram_write_next;
+end
+
+
+
+endmodule : DRAM
+
+
 module Data_Memory (
 input clk,
 input rst,
@@ -28,7 +210,8 @@ output reg [31:0] mem_result,
 output reg [31:0] write_back_inst,
 output freeze_cpu
 );
-
+//parameter LATENCY = 20;
+parameter LATENCY = 4;
 reg [31:0] dmem [63:0];
 logic [31:0] write_back_inst_next;
 logic [31:0] mem_result_next;
@@ -38,11 +221,11 @@ logic [7:0] delay_counter_next;
 wire [2:0] funct3 = mem_inst[14:12];
 
 assign is_load_store = mem_inst[6:0] == 7'b0000011 || mem_inst[6:0] == 7'b0100011;
-assign freeze_cpu = is_load_store && delay_counter != 4;
+assign freeze_cpu = is_load_store && delay_counter != LATENCY;
 
 logic [31:0] mem_write_next;
 always_comb begin
-    if (delay_counter == 4 && mem_inst[6:0] == 7'b0100011) // STORE (Store to Memory) Spec. PDF-Page 42 )
+    if (delay_counter == LATENCY && mem_inst[6:0] == 7'b0100011) // STORE (Store to Memory) Spec. PDF-Page 42 )
     begin
         if (funct3 == 3'b000) // SB (Store Byte)
 	    begin
@@ -76,11 +259,11 @@ always_comb begin
             mem_result_next = exe_result;
         end
     end
-    else if (delay_counter > 0 && delay_counter < 4) begin
+    else if (delay_counter > 0 && delay_counter < LATENCY) begin
         delay_counter_next = delay_counter + 1;
         mem_result_next = mem_result;
     end
-    else if (delay_counter == 4) begin
+    else if (delay_counter == LATENCY) begin
          delay_counter_next = 0;
          if (mem_inst[6:0] == 7'b0000011) // LOAD (Load to Register) Spec. PDF-Page 42 )
          begin
@@ -164,11 +347,24 @@ always_ff @ (posedge clk) begin
 	
 end
 
+`include "verification.vh"
 
+reg[15:0] clk_counter;
+reg is_finished;
+always #10 begin
+    clk_counter <= clk_counter + 1; 
+    if (`PASS_CONDITION && !is_finished) begin
+        $display("cycle count %d", clk_counter);
+        is_finished <= 1;
+    end
+end
 initial begin
-    `include "verification.vh"
+    is_finished = 0;
+    clk_counter = 0;
+    
+    
+    
     #`SIMULATION_FINISH_TIME;
-    `sayHi
     `REGISTER_FILE_CHECK
     
 end
@@ -202,16 +398,8 @@ initial begin
     end
     
     // Load test instructions
-//    $readmemh("inst1.mem", imem); // Register 2 should contain 0x40
-//    $readmemh("RAWhandling2.mem", imem); // Register 2 should contain 0x40
-//    $readmemh("RAWhandling3.mem", imem); // Register 2 should contain 0x40
-//    $readmemh("RAWhandling4.mem", imem); // Register 2 should contain 0x40
-//    $readmemh("RAWhandlingRS2.mem", imem); // Register 2 should contain 0x40
-    $readmemh("LoadStore.mem", imem); // Register 2 <- 0x40 and Mem 0 <- 0x20
-//    $readmemh("BranchStall.mem", imem); // Register 2 <- 0x03
-//    $readmemh("BranchStallTaken.mem", imem); // Register 1 <- 0x06
-    
-    
+    `include "verification.vh"
+    `INSTRUCTION_MEMORY_SETTING
 end
 
 
