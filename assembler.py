@@ -35,7 +35,7 @@ SW      rs1, rs2, imm   - base, src, offset
 ADDI    rd, rs1, imm    - dest, src, immediate
 SLTI    unimplemented
 SLTIU   unimplemented
-XORI    unimplemented
+XORI    rd, rs1, imm    - dest, src, immediate
 ORI     unimplemented
 ANDI    unimplemented
 SLLI    unimplemented
@@ -126,6 +126,13 @@ def getMachineCode(token, oprd):
     elif (token[0].lower() == 'addi'):
         opcode = 0x13
         funct3 = 0x0
+        rd = oprd[0]
+        rs1 = oprd[1]
+        imm = oprd[2]
+        mc = imm << 20 | rs1 << 15 | funct3 << 12 | rd << 7 | opcode
+    elif (token[0].lower() == 'xori'):
+        opcode = 0x13
+        funct3 = 0x4
         rd = oprd[0]
         rs1 = oprd[1]
         imm = oprd[2]

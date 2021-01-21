@@ -64,7 +64,7 @@ module main(
         rst <= 1;
         #10 rst <= 0;
         
-        `include "verification.vh"
+        `include "verification.svh"
         #`SIMULATION_FINISH_TIME $finish;            // Quit the simulation
         
     end
@@ -196,6 +196,24 @@ always_comb begin
     else
         rs2_forward_next = 0;
 end
+
+
+//reg [7:0] counter;
+//logic [7:0] counter_next;
+//wire is_one_step_raw = (addr1 != 0) && next_inst_need_rd && need_rs1 && (addr1 == next_inst_rd_addr);
+//wire need_NOP_after_LOAD = is_one_step_raw && (exe_inst[6:0] ==   7'b0000011);  // LOAD (Load to Register) Spec. PDF-Page 42 )
+//always_ff @(posedge clk) begin
+//    counter <= counter_next;
+//end
+//always_comb begin
+//    if (rst)    counter_next = 0;
+//    else if (counter == 0 && need_NOP_after_LOAD)  // LOAD (Load to Register) Spec. PDF-Page 42 )
+//        counter_next = 1;
+//    else
+//        counter_next = 0;
+//end
+
+
 
 always_comb begin
     if (rst)                PC_next = 0;

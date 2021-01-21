@@ -52,7 +52,7 @@ wire [19:0] tag_field = mem_addr[31:12];
 wire [11:0] offset_field = mem_addr[4:0];
 logic [31:0] mem_result_next;
 logic [31:0] write_back_inst_next;
-
+logic [31:0] cache_data_write_next;
 assign dram_addr = mem_addr;
 assign dram_write_data = exe_result;
 //----
@@ -62,17 +62,28 @@ localparam SIG_IDLE = 0, SIG_READ = 1, SIG_WRITE = 2;
 
 
 assign is_load_store = mem_inst[6:0] == 7'b0000011 || mem_inst[6:0] == 7'b0100011;
+wire cache_hit = valid[index_field] && tags[index_field] == tag_field;
 
-
+always_comb begin
+    if (is_load_store && !cache_hit && !freeze_cpu) begin
+        if (mem_inst[6:0] == 7'b0000011) // LOAD
+            cache_data_write_next = dram_result;
+        else
+            cache_data_write_next = exe_result;
+    end
+    else
+        cache_data_write_next = data[{index_field, offset_field}];
+end
 
 // ------------------------ Freeze CPU and Memory Result ------------------------ 
 always_comb begin
     if (is_load_store)
     begin
-        if (valid[index_field] && tags[index_field] == tag_field) 
+        if (cache_hit) 
         begin // cache hit
             freeze_cpu = 0; 
             mem_result_next = data[{index_field, offset_field}];
+            //cache_data_write_next = data[{index_field, offset_field}];
         end
         else
         begin // cache miss
@@ -80,11 +91,13 @@ always_comb begin
             begin
                 freeze_cpu = 1;
                 mem_result_next = mem_result;
+                //cache_data_write_next = data[{index_field, offset_field}];
             end
             else    // DRAM fetch complete
             begin
                 freeze_cpu = 0;
                 mem_result_next = dram_result;
+                //cache_data_write_next = dram_result;
             end
         end
     end
@@ -128,6 +141,7 @@ always_ff @(posedge clk) begin
     valid <= valid_next;
     mem_result <= mem_result_next;
     write_back_inst <= write_back_inst_next;
+    data[{index_field, offset_field}] = cache_data_write_next;
 end
 
 endmodule : Cache
@@ -347,7 +361,7 @@ always_ff @ (posedge clk) begin
 	
 end
 
-`include "verification.vh"
+`include "verification.svh"
 
 reg[15:0] clk_counter;
 reg is_finished;
@@ -398,7 +412,7 @@ initial begin
     end
     
     // Load test instructions
-    `include "verification.vh"
+    `include "verification.svh"
     `INSTRUCTION_MEMORY_SETTING
 end
 

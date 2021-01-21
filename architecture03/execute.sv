@@ -149,7 +149,10 @@ begin
 	       exe_result_next = rs1_data & rs2_data;	    
     end
     else
+    begin
         exe_result_next = 0;
+        
+    end
 end
 
 always_comb begin

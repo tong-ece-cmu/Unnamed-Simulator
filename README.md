@@ -3,7 +3,7 @@
 
 Here stores different CPU designs and their design notes; Experiments with different hardware description languages, Verilog, System C, and System Verilog; Experiments with different hardware design techniques, data forwarding, automated verification, etc. 
 
-## Microarchitectures (Latest & Greatest on the top)
+## Microarchitectures (The Latest & Greatest on the top)
 
 **architecture03** is a four-stage pipelined RISC-V RV32I CPU written in System Verilog with data forwarding to minimize stall. 
 
@@ -20,9 +20,11 @@ Here stores different CPU designs and their design notes; Experiments with diffe
 
 ## Tool box
 
-**assembler.py** is a RISC-V assembler I wrote. It compiles assembly into machine code in mem file format. I used it to compile assembly test cases.
+**assembler.py** is a RISC-V assembler I wrote. It compiles assembly into machine code in mem file format. I used it to compile assembly test cases. Create a new program string in the python script, point the asem variable to the new program string, and hit the run button of your python IDE to print machine code in console.
 
-**Xilinx Vivado** is the simulator I currently use.
+**SIEMENS ModelSim PE Student Edition** is the simulator I currently use.
+
+**Xilinx Vivado** is the simulator I used for **architecture01** and part of **architecture03**.
 
 **System C Visual Studio** is the simulator I used for **architecture02**. 
 
