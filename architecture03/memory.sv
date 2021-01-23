@@ -20,16 +20,20 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 
-module Cache (
+module Cache #(
+parameter DATA_WIDTH = 8
+)
+(
 input clk,
 input rst,
 input [31:0] mem_inst,
 input [31:0] exe_result, mem_addr,
 input dram_ready,
-input [31:0] dram_result,
+input [DATA_WIDTH-1:0] dram_result,
 output logic [1:0] dram_signal,
-output [31:0] dram_addr,
-output [31:0] dram_write_data,
+output logic [31:0] dram_addr_rd,
+output logic [31:0] dram_addr_wr,
+output logic [DATA_WIDTH-1:0] dram_write_data,
 output reg [31:0] mem_result,
 output reg [31:0] write_back_inst,
 output logic freeze_cpu
@@ -37,34 +41,43 @@ output logic freeze_cpu
 
 // 4KiB cache, 4 bytes a word
 // 4KiB cache, 4 bytes a word, 1024 word
-reg [31:0] data [1023:0];
+reg [DATA_WIDTH-1:0] data [4095:0];
 
 // 4KiB cache, 32 bytes block size, each block 8 words
-// 32 bytes block size, each block 8 words
+// 32 bytes block size, each block 32 bytes
 // 4KiB cache, 128 blocks
 // 32 bit address, 5 bit block offset, 7 bit cache index, 20 bit tag
 reg [19:0] tags [127:0];
-reg [127:0] valid;
-logic [127:0] valid_next;
+logic [19:0] tags_next;
+reg valid [127:0];
+logic valid_next;
 wire is_load_store;
 wire [6:0] index_field = mem_addr[11:5];
 wire [19:0] tag_field = mem_addr[31:12];
-wire [11:0] offset_field = mem_addr[4:0];
+wire [4:0] offset_field = mem_addr[4:0];
 logic [31:0] mem_result_next;
 logic [31:0] write_back_inst_next;
-logic [31:0] cache_data_write_next;
-assign dram_addr = mem_addr;
-assign dram_write_data = exe_result;
+logic [DATA_WIDTH-1:0] cache_data_write_next;
+//assign dram_addr = mem_addr;
+//assign dram_write_data = exe_result;
 //----
-
+localparam BLOCK_SIZE = 32;
 localparam SIG_IDLE = 0, SIG_READ = 1, SIG_WRITE = 2;
 
+reg [7:0] cache_counter;
+logic [7:0] cache_counter_next;
+//wire [4:0] cache_counter_offset = cache_counter_next - 2;
+reg [4:0] block_addr_counter;
+logic [4:0] block_addr_counter_next;
+logic [11:0] cache_data_addr;
 
+wire is_store = mem_inst[6:0] == 7'b0100011; // STORE (Store to Memory) Spec. PDF-Page 42 )
+wire is_load = mem_inst[6:0] == 7'b0000011; // LOAD (Load from Memory) Spec. PDF-Page 42 )
 
-assign is_load_store = mem_inst[6:0] == 7'b0000011 || mem_inst[6:0] == 7'b0100011;
+assign is_load_store = is_store || is_load;
 wire cache_hit = valid[index_field] && tags[index_field] == tag_field;
 
-always_comb begin
+/*always_comb begin
     if (is_load_store && !cache_hit && !freeze_cpu) begin
         if (mem_inst[6:0] == 7'b0000011) // LOAD
             cache_data_write_next = dram_result;
@@ -73,63 +86,167 @@ always_comb begin
     end
     else
         cache_data_write_next = data[{index_field, offset_field}];
-end
+end*/
+wire [7:0] r_start = 2 + BLOCK_SIZE;
 
-// ------------------------ Freeze CPU and Memory Result ------------------------ 
 always_comb begin
-    if (is_load_store)
-    begin
-        if (cache_hit) 
-        begin // cache hit
-            freeze_cpu = 0; 
-            mem_result_next = data[{index_field, offset_field}];
-            //cache_data_write_next = data[{index_field, offset_field}];
+    if (rst) begin
+        cache_counter_next = 0;
+        block_addr_counter_next = 0;
+    end
+    else if (cache_counter == 0) begin
+        if (is_load_store && !cache_hit) begin
+            if (valid[index_field]) begin
+                cache_counter_next = 1;
+                block_addr_counter_next = 0;
+            end
+            else begin
+                cache_counter_next = r_start;
+                block_addr_counter_next = 0;
+            end
         end
-        else
-        begin // cache miss
-            if (dram_ready == 0) // DRAM is fetching
-            begin
-                freeze_cpu = 1;
-                mem_result_next = mem_result;
-                //cache_data_write_next = data[{index_field, offset_field}];
-            end
-            else    // DRAM fetch complete
-            begin
-                freeze_cpu = 0;
-                mem_result_next = dram_result;
-                //cache_data_write_next = dram_result;
-            end
+        else begin
+            cache_counter_next = 0;
+            block_addr_counter_next = 0;
         end
     end
-    else
-    begin
-        freeze_cpu = 0;
-        mem_result_next = exe_result;
+    else if (cache_counter == 1) begin
+        if (dram_ready) begin
+            cache_counter_next = cache_counter + 1;
+            block_addr_counter_next = block_addr_counter + 1;
+        end
+        else begin
+            cache_counter_next = cache_counter;
+            block_addr_counter_next = block_addr_counter_next;
+        end
+    end
+    else if (cache_counter >= 2 && cache_counter < 2 + BLOCK_SIZE) begin
+        cache_counter_next = cache_counter + 1;
+        block_addr_counter_next = block_addr_counter + 1;
+    end
+    else if (cache_counter == r_start) begin
+        if (dram_ready) begin
+            cache_counter_next = cache_counter + 1;
+            block_addr_counter_next = block_addr_counter + 1; // overflow to zero
+        end
+        else begin
+            cache_counter_next = cache_counter;
+            block_addr_counter_next = block_addr_counter; // overflow to zero
+        end
+    end
+    else if (cache_counter >= r_start + 1 && cache_counter < r_start + BLOCK_SIZE) begin
+        cache_counter_next = cache_counter + 1;
+        block_addr_counter_next = block_addr_counter + 1;
+    end
+    else if (cache_counter == r_start + BLOCK_SIZE) begin
+        cache_counter_next = 0;
+        block_addr_counter_next = 0;
+    end
+    else begin
+        cache_counter_next = 0;
+        block_addr_counter_next = 0;
     end
 end
 
+// ------------------------ DRAM Read(LOAD) ------------------------ 
+always_comb begin
+    if (cache_counter_next == 0 && is_store) begin
+        dram_addr_rd = 0;
+        cache_data_write_next = exe_result;
+        cache_data_addr = {index_field, offset_field};
+    end
+    if (cache_counter_next >= r_start + 1 && cache_counter_next < r_start + BLOCK_SIZE) begin
+        if (block_addr_counter == offset_field && is_store) begin
+            dram_addr_rd = {tag_field, index_field, block_addr_counter};
+            cache_data_write_next = exe_result[7:0];
+            cache_data_addr = {index_field, block_addr_counter};
+        end
+        else if (block_addr_counter == offset_field + 1 && is_store) begin
+            dram_addr_rd = {tag_field, index_field, block_addr_counter};
+            cache_data_write_next = exe_result[15:8];
+            cache_data_addr = {index_field, block_addr_counter};
+        end
+        else if (block_addr_counter == offset_field + 2 && is_store) begin
+            dram_addr_rd = {tag_field, index_field, block_addr_counter};
+            cache_data_write_next = exe_result[23:16];
+            cache_data_addr = {index_field, block_addr_counter};
+        end
+        else if (block_addr_counter == offset_field + 3 && is_store) begin
+            dram_addr_rd = {tag_field, index_field, block_addr_counter};
+            cache_data_write_next = exe_result[31:24];
+            cache_data_addr = {index_field, block_addr_counter};
+        end
+        else begin
+            dram_addr_rd = {tag_field, index_field, block_addr_counter};
+            cache_data_write_next = dram_result;
+            cache_data_addr = {index_field, block_addr_counter};
+        end
+    end
+    else begin
+        dram_addr_rd = 0;
+        cache_data_write_next = data[cache_data_addr];
+        cache_data_addr = {index_field, block_addr_counter};
+    end
+end
+
+// ------------------------ DRAM Write(STORE) ------------------------ 
+always_comb begin
+    if (cache_counter_next >= 2 && cache_counter_next < 2 + BLOCK_SIZE-1) begin
+        dram_addr_wr = {tag_field, index_field, block_addr_counter};
+        dram_write_data = data[{index_field, block_addr_counter}];
+    end
+    else begin
+        dram_addr_wr = 0;
+        dram_write_data = 0;
+    end
+end
 
 // ------------------------ DRAM signals ------------------------ 
 always_comb begin
-    if (is_load_store)
-    begin
-        if (valid[index_field] && tags[index_field] == tag_field) 
-        begin
-            dram_signal = SIG_IDLE;
-        end
-        else
-            dram_signal = mem_inst[6:0] == 7'b0000011 ? SIG_READ : SIG_WRITE; // LOAD is read
-    end
+    if (cache_counter_next >= 1 && cache_counter_next < 2 + BLOCK_SIZE)
+        dram_signal = SIG_WRITE;
+    else if (cache_counter_next >= r_start && cache_counter_next < r_start + BLOCK_SIZE)
+        dram_signal = SIG_READ;
     else
         dram_signal = SIG_IDLE;
 end
 
 
+// Little Endian
+// ------------------------ Memory Result ------------------------ 
 always_comb begin
-    if (rst)
-        valid_next = 0;
+    if (is_load)
+        mem_result_next = {data[{index_field, offset_field+3}],
+                            data[{index_field, offset_field}+2],
+                            data[{index_field, offset_field}+1],
+                            data[{index_field, offset_field}+0]};
     else
-        valid_next = valid;
+        mem_result_next = exe_result;
+end
+
+
+// ------------------------ Freeze CPU ------------------------ 
+always_comb begin
+    if (cache_counter_next == 0)
+        freeze_cpu = 0;
+    else
+        freeze_cpu = 1;
+end
+
+
+always_comb begin
+    if (rst) begin
+        valid_next = 0;
+        tags_next = tags[index_field];
+    end
+    else if (cache_counter == r_start + BLOCK_SIZE) begin
+        valid_next = 1;
+        tags_next = tag_field;
+    end
+    else begin
+        valid_next = valid[index_field];
+        tags_next = tags[index_field];
+    end
 end
 
 always_comb begin
@@ -138,46 +255,79 @@ always_comb begin
 end
 
 always_ff @(posedge clk) begin
-    valid <= valid_next;
+    valid[index_field] <= valid_next;
+    tags[index_field] <= tags_next;
     mem_result <= mem_result_next;
     write_back_inst <= write_back_inst_next;
-    data[{index_field, offset_field}] = cache_data_write_next;
+    data[cache_data_addr] <= cache_data_write_next;
+    cache_counter <= cache_counter_next;
+    block_addr_counter <= block_addr_counter_next;
+end
+
+//integer i;
+initial begin
+    /*
+    // Initialize all valid bit to zero, implement it later
+    for (i=0; i<128; i=i+1) begin
+        #0 valid[i] <= 0;
+        
+    end
+    */
+
 end
 
 endmodule : Cache
 
-module DRAM (
+
+
+
+
+
+
+
+module DRAM #(
+parameter DATA_WIDTH=8
+)
+(
 input clk,
 input rst,
 input logic [1:0] dram_signal,
-input [31:0] dram_addr,
-input [31:0] dram_write_data,
+input [31:0] dram_addr_wr,
+input [31:0] dram_addr_rd,
+input [DATA_WIDTH-1:0] dram_write_data,
 output dram_ready,
-output logic [31:0] dram_result
+output logic [DATA_WIDTH-1:0] dram_result
 );
 localparam SIG_IDLE = 0, SIG_READ = 1, SIG_WRITE = 2;
+localparam BLOCK_SIZE = 32;
 //parameter LATENCY = 20;
 parameter LATENCY = 4;
-reg [31:0] dmem [63:0];
+reg [DATA_WIDTH-1:0] dmem [63:0];
 reg [7:0] delay_counter;
 logic [7:0] delay_counter_next;
 
 wire is_read_write = dram_signal == SIG_READ || dram_signal == SIG_WRITE;
-wire dram_busy = is_read_write && delay_counter != LATENCY;
+wire dram_busy = is_read_write && delay_counter >= 0 && delay_counter < LATENCY;
 assign dram_ready = !dram_busy;
 
-logic [31:0] dram_write_next;
+logic [DATA_WIDTH-1:0] dram_write_next;
 
+// ------------------------ DRAM write ------------------------ 
 always_comb begin
     if (delay_counter == LATENCY && dram_signal == SIG_WRITE)
         dram_write_next = dram_write_data;
+    else if (delay_counter > LATENCY && delay_counter < LATENCY + BLOCK_SIZE && dram_signal == SIG_WRITE)
+        dram_write_next = dram_write_data;
     else
-        dram_write_next = dmem[dram_addr];
+        dram_write_next = dmem[dram_addr_wr];
 end
 
+// ------------------------ DRAM read ------------------------ 
 always_comb begin
     if (delay_counter == LATENCY && dram_signal == SIG_READ)
-        dram_result = dmem[dram_addr];
+        dram_result = dmem[dram_addr_rd];
+    else if (delay_counter > LATENCY && delay_counter < LATENCY + BLOCK_SIZE && dram_signal == SIG_READ)
+        dram_result = dmem[dram_addr_rd];
     else
         dram_result = 0;
 end
@@ -198,16 +348,22 @@ always_comb begin
         delay_counter_next = delay_counter + 1;
     end
     else if (delay_counter == LATENCY) begin
+         delay_counter_next = delay_counter + 1;
+    end
+    else if (delay_counter > LATENCY && delay_counter < LATENCY + BLOCK_SIZE) begin
+         delay_counter_next = delay_counter + 1;
+    end
+    else if (delay_counter == LATENCY + BLOCK_SIZE) begin
          delay_counter_next = 0;
     end
     else begin
-        delay_counter_next = 0;
+        delay_counter_next = delay_counter;
     end
 end
 
 always_ff @(posedge clk) begin
     delay_counter <= delay_counter_next;
-    dmem[dram_addr] <= dram_write_next;
+    dmem[dram_addr_wr] <= dram_write_next;
 end
 
 

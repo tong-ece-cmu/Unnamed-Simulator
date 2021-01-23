@@ -40,10 +40,11 @@ module main(
     
     // DRAM
     wire dram_ready;
-    wire [31:0] dram_result;
+    wire [7:0] dram_result;
     wire [1:0] dram_signal;
-    wire [31:0] dram_addr;
-    wire [31:0] dram_write_data;
+    wire [31:0] dram_addr_rd;
+    wire [31:0] dram_addr_wr;
+    wire [7:0] dram_write_data;
     
     wire[31:0] inst, PC;
     

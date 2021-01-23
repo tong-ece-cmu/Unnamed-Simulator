@@ -9,7 +9,7 @@ class TargetOptions(enum.Enum):
    VivadoMem = 1
    SystemcArray = 2
 
-assembler_target = TargetOptions.SystemcArray
+assembler_target = TargetOptions.VivadoMem
 
 
 '''
@@ -26,21 +26,21 @@ BLTU    unimplemented
 BGEU    unimplemented
 LB      unimplemented
 LH      unimplemented
-LW      rd, rs1, imm     - dest, base, offset
+LW      rd, rs1, imm     - dest, base address, offset
 LBU     unimplemented
 LHU     unimplemented
 SB      unimplemented
 SH      unimplemented
-SW      rs1, rs2, imm   - base, src, offset
+SW      rs1, rs2, imm   - base address, src, offset
 ADDI    rd, rs1, imm    - dest, src, immediate
-SLTI    unimplemented
-SLTIU   unimplemented
-XORI    rd, rs1, imm    - dest, src, immediate
-ORI     unimplemented
-ANDI    unimplemented
-SLLI    unimplemented
-SRLI    unimplemented
-SRAI    unimplemented
+SLTI    rd, rs1, imm    - dest, src, immediate - untested
+SLTIU   rd, rs1, imm    - dest, src, immediate - untested
+XORI    rd, rs1, imm    - dest, src, immediate - untested
+ORI     rd, rs1, imm    - dest, src, immediate - untested
+ANDI    rd, rs1, imm    - dest, src, immediate - untested
+SLLI    rd, rs1, imm    - dest, src, immediate - untested
+SRLI    rd, rs1, imm    - dest, src, immediate - untested
+SRAI    rd, rs1, imm    - dest, src, immediate - untested
 ADD     unimplemented
 SUB     unimplemented
 SLL     unimplemented
@@ -79,6 +79,11 @@ p3 = '''ADDI x1, x0, 4
 SW x0, x1, 0
 LW x2, x0, 0
 '''
+
+p4 = '''ADDI x1, x0, -4
+; comment
+XORI X1, x1, 2
+'''
 # f = open('..\\HighLevelLanguageTests\\addition.assembly', "r")
 # f = open('..\\HighLevelLanguageTests\\branch.assembly', "r")
 # asem = f.read()
@@ -98,7 +103,7 @@ def getOperands(tokens):
     operand = [0, 0, 0]
     for i in range(len(tokens)):
         if (i == 0) : continue
-        if (tokens[i][0] == 'x'):
+        if (tokens[i][0].lower() == 'x'):
             operand[i-1] = int(tokens[i][1:])
         else:
             operand[i-1] = int(tokens[i])
@@ -123,19 +128,40 @@ def getMachineCode(token, oprd):
         imm11_5 = oprd[2] >> 5 & 0x7F
         mc = rs2 << 20 | rs1 << 15 | funct3 << 12 | imm4_0 << 7 | opcode
         mc = imm11_5 << 25 | mc
-    elif (token[0].lower() == 'addi'):
+    elif (token[0].lower() == 'addi' or token[0].lower() == 'slti' or
+          token[0].lower() == 'sltiu' or token[0].lower() == 'xori' or
+          token[0].lower() == 'ori' or token[0].lower() == 'andi'):
         opcode = 0x13
-        funct3 = 0x0
+        if (token[0].lower() == 'addi'):
+            funct3 = 0x0
+        elif (token[0].lower() == 'slti'):
+            funct3 = 0x2
+        elif (token[0].lower() == 'sltiu'):
+            funct3 = 0x3
+        elif (token[0].lower() == 'xori'):
+            funct3 = 0x4
+        elif (token[0].lower() == 'ori'):
+            funct3 = 0x6
+        elif (token[0].lower() == 'andi'):
+            funct3 = 0x7
         rd = oprd[0]
         rs1 = oprd[1]
         imm = oprd[2]
         mc = imm << 20 | rs1 << 15 | funct3 << 12 | rd << 7 | opcode
-    elif (token[0].lower() == 'xori'):
+    elif (token[0].lower() == 'slli' or token[0].lower() == 'srli' or
+          token[0].lower() == 'srai'):
         opcode = 0x13
-        funct3 = 0x4
+        if (token[0].lower() == 'slli'):
+            funct3 = 0x1
+            imm = oprd[2]
+        elif (token[0].lower() == 'srli'):
+            funct3 = 0x5
+            imm = oprd[2]
+        elif (token[0].lower() == 'srai'):
+            funct3 = 0x5
+            imm = oprd[2] | 0x400
         rd = oprd[0]
         rs1 = oprd[1]
-        imm = oprd[2]
         mc = imm << 20 | rs1 << 15 | funct3 << 12 | rd << 7 | opcode
     elif (token[0].lower() == 'beq'):
         opcode = 0x63
@@ -165,6 +191,8 @@ def getMachineCode(token, oprd):
         imm20   = oprd[1] >> 20 & 0x1
         mc = imm10_1 << 21 | imm11 << 20 | imm19_12 << 12 | rd << 7 | opcode
         mc = imm20 << 31 | mc
+    else:
+        print("Unimplemented Instruction "+str(opcode))
     return mc
 
 
@@ -187,7 +215,9 @@ def printHex(mc):
     print("")
 
 for s in asem.splitlines():
-    tokens = re.split(', | |,', s)
+    tokens = re.split(', +| |,', s)
+    if tokens[0] == ';':
+        continue
     oprd = getOperands(tokens)
     mc = getMachineCode(tokens, oprd)
     
@@ -201,7 +231,10 @@ for s in asem.splitlines():
 
 
 
+#%%
 
+x = 20
+print(hex(~x + 1))
 
 
 
