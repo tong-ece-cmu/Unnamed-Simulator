@@ -8,8 +8,9 @@ import enum
 class TargetOptions(enum.Enum):
    VivadoMem = 1
    SystemcArray = 2
+   ModelSimMem = 3
 
-assembler_target = TargetOptions.VivadoMem
+assembler_target = TargetOptions.ModelSimMem
 
 
 '''
@@ -81,14 +82,14 @@ LW x2, x0, 0
 '''
 
 p4 = '''ADDI x1, x0, -4
-; comment
+;comment
 XORI X1, x1, 2
 '''
 # f = open('..\\HighLevelLanguageTests\\addition.assembly', "r")
 # f = open('..\\HighLevelLanguageTests\\branch.assembly', "r")
 # asem = f.read()
 
-asem = p2
+asem = p4
 
 # for each line
     # get list of tokens, split string on space and comma
@@ -192,7 +193,7 @@ def getMachineCode(token, oprd):
         mc = imm10_1 << 21 | imm11 << 20 | imm19_12 << 12 | rd << 7 | opcode
         mc = imm20 << 31 | mc
     else:
-        print("Unimplemented Instruction "+str(opcode))
+        print("Unimplemented Instruction "+str(token[0]))
     return mc
 
 
@@ -214,9 +215,22 @@ def printHex(mc):
         print("{0:#0{1}x}".format((mc >> 8*i) & 0xFF,4))
     print("")
 
+def printModelSimHex(mc):
+    # {   # Format identifier
+    # 0:  # first parameter
+    # #   # use "0x" prefix
+    # 0   # fill with zeroes
+    # {1} # to a length of n characters (including 0x), defined by the second parameter
+    # x   # hexadecimal number, using lowercase letters for a-f
+    # }   # End of format identifier
+    # https://stackoverflow.com/questions/12638408/decorating-hex-function-to-pad-zeros
+    for i in range(4):
+        print("{0:0{1}x}".format((mc >> 8*i) & 0xFF,2))
+    print("")
+
 for s in asem.splitlines():
     tokens = re.split(', +| |,', s)
-    if tokens[0] == ';':
+    if tokens[0][0] == ';':
         continue
     oprd = getOperands(tokens)
     mc = getMachineCode(tokens, oprd)
@@ -225,6 +239,10 @@ for s in asem.splitlines():
         printHex(mc)
     elif assembler_target == TargetOptions.SystemcArray:
         printInstArray(mc)
+    elif assembler_target == TargetOptions.ModelSimMem:
+        printModelSimHex(mc)
+    else:
+        print("Invalid Output Option")
 
 
 
@@ -233,8 +251,8 @@ for s in asem.splitlines():
 
 #%%
 
-x = 20
-print(hex(~x + 1))
+# x = 20
+# print(hex(~x + 1))
 
 
 

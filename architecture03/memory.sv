@@ -49,7 +49,7 @@ reg [DATA_WIDTH-1:0] data [4095:0];
 // 32 bit address, 5 bit block offset, 7 bit cache index, 20 bit tag
 reg [19:0] tags [127:0];
 logic [19:0] tags_next;
-reg valid [127:0];
+reg [127:0] valid;
 logic valid_next;
 wire is_load_store;
 wire [6:0] index_field = mem_addr[11:5];
@@ -240,11 +240,11 @@ always_comb begin
         tags_next = tags[index_field];
     end
     else if (cache_counter == r_start + BLOCK_SIZE) begin
-        valid_next = 1;
+        valid_next = valid | (1 << index_field);
         tags_next = tag_field;
     end
     else begin
-        valid_next = valid[index_field];
+        valid_next = valid;
         tags_next = tags[index_field];
     end
 end
@@ -255,7 +255,7 @@ always_comb begin
 end
 
 always_ff @(posedge clk) begin
-    valid[index_field] <= valid_next;
+    valid <= valid_next;
     tags[index_field] <= tags_next;
     mem_result <= mem_result_next;
     write_back_inst <= write_back_inst_next;
@@ -264,12 +264,12 @@ always_ff @(posedge clk) begin
     block_addr_counter <= block_addr_counter_next;
 end
 
-//integer i;
+integer i;
 initial begin
     /*
     // Initialize all valid bit to zero, implement it later
     for (i=0; i<128; i=i+1) begin
-        #0 valid[i] <= 0;
+        valid[i] <= 0;
         
     end
     */

@@ -64,9 +64,10 @@ module main(
         clk <= 0;
         rst <= 1;
         #10 rst <= 0;
-        
+
         `include "verification.svh"
         #`SIMULATION_FINISH_TIME $finish;            // Quit the simulation
+        
         
     end
     

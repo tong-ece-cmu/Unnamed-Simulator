@@ -94,6 +94,11 @@ If we have a cache miss. If valid is true, we start from the beginning, if valid
 
 Rough outline of cache is done. Now start debugging. AAAAAANNNNNDDDDD, first test case passssssssssssssed.
 
+We need to find a way to initialize all valid bit to zero. And since we are using ModelSim now, let's try assert.
+
+Ok, we can just declare Valid bits as one 128bit register not as memory. We can reset it by assigning zero. To get one bit high, we can use some bit manipulation to flip that bit:
+
+```valid_next = valid | (1 << index_field);``` 
 
 
 

@@ -7,10 +7,13 @@ Here stores different CPU designs and their design notes; Experiments with diffe
 
 **architecture03** is a four-stage pipelined RISC-V RV32I CPU written in System Verilog with data forwarding to minimize stall. 
 
-- [Completed] Data forwarding
+- [Completed] Data Forwarding
 - [Completed] Memory module with delay
 - [Completed] Automated Assertion Test Cases Checking
-- [Happening] 4kB Cache
+- [Completed] 4kB Direct-Mapped Cache - 32 bytes Block Size
+- [TODO] Data Forwarding Special Case
+- [TODO] Branching
+- [TODO] More Assembly Programs for Testing
 - [TODO] Dual Core
 
 

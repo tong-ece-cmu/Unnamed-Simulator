@@ -9,83 +9,75 @@
 //`define TEST_BRANCH_STALL 1
 //`define TEST_BRANCH_STALL_TAKEN 1
 
-`define assert(cond) \
-if (cond)\
-    $display("Test Passed");\
-else\
-    $error("Test Failed");
-
 `ifdef TEST_LOAD_STORE
-
-    `define INSTRUCTION_MEMORY_SETTING \
-    $readmemh("LoadStore.mem", imem); // Register 2 <- 0x40 and Mem 0 <- 0x20
-    
+    // Register 2 <- 0x40 and Mem 0 <- 0x20
+    `define INSTRUCTION_MEMORY_SETTING $readmemh("LoadStore.mem", imem); 
     `define REGISTER_FILE_CHECK \
-    $display("check LOAD_STORE");\
-    `assert(registers[2] == 32'h40)
+    assert(registers[2] == 32'h40) $display("LOAD_STORE Passed");\
+    else $display("LOAD_STORE Failed");
     
     `define PASS_CONDITION (registers[2] == 32'h40)
 
 `elsif TEST_INST1
-    `define INSTRUCTION_MEMORY_SETTING \
-    $readmemh("inst1.mem", imem); // Register 2 should contain 0x40    
+    // Register 2 should contain 0x40  
+    `define INSTRUCTION_MEMORY_SETTING $readmemh("inst1.mem", imem);   
     `define REGISTER_FILE_CHECK \
-    $display("check INST1");\
-    `assert(registers[2] == 32'h40)
+    assert(registers[2] == 32'h40) $display("INST1 Passed");\
+    else $display("INST1 Failed");
     `define PASS_CONDITION (registers[2] == 32'h40)
     
 `elsif TEST_RAW_HANDLING2 
-    `define INSTRUCTION_MEMORY_SETTING \
-    $readmemh("RAWhandling2.mem", imem); // Register 2 should contain 0x40
+    // Register 2 should contain 0x40
+    `define INSTRUCTION_MEMORY_SETTING $readmemh("RAWhandling2.mem", imem); 
     `define REGISTER_FILE_CHECK \
-    $display("check RAW HANDLING 2");\
-    `assert(registers[2] == 32'h40)
+    assert(registers[2] == 32'h40) $display("RAW HANDLING 2 Passed");\
+    else $display("RAW HANDLING 2 Failed");
     `define PASS_CONDITION (registers[2] == 32'h40)
     
 `elsif TEST_RAW_HANDLING3 
-    `define INSTRUCTION_MEMORY_SETTING \
-    $readmemh("RAWhandling3.mem", imem); // Register 2 should contain 0x40
+    // Register 2 should contain 0x40
+    `define INSTRUCTION_MEMORY_SETTING $readmemh("RAWhandling3.mem", imem); 
     `define REGISTER_FILE_CHECK \
-    $display("check RAW HANDLING 3");\
-    `assert(registers[2] == 32'h40)
+    assert(registers[2] == 32'h40) $display("RAW HANDLING 3 Passed");\
+    else $display("RAW HANDLING 3 Failed");
     `define PASS_CONDITION (registers[2] == 32'h40)
     
 `elsif TEST_RAW_HANDLING4 
-    `define INSTRUCTION_MEMORY_SETTING \
-    $readmemh("RAWhandling4.mem", imem); // Register 2 should contain 0x40
+    // Register 2 should contain 0x40
+    `define INSTRUCTION_MEMORY_SETTING $readmemh("RAWhandling4.mem", imem); 
     `define REGISTER_FILE_CHECK \
-    $display("check RAW HANDLING 4");\
-    `assert(registers[2] == 32'h40)
+    assert(registers[2] == 32'h40) $display("RAW HANDLING 4 Passed");\
+    else $display("RAW HANDLING 4 Failed");
     `define PASS_CONDITION (registers[2] == 32'h40)
     
 `elsif TEST_RAW_HANDLING_RS2 
-    `define INSTRUCTION_MEMORY_SETTING \
-    $readmemh("RAWhandlingRS2.mem", imem); // Register 2 should contain 0x40
+    // Register 2 should contain 0x40
+    `define INSTRUCTION_MEMORY_SETTING $readmemh("RAWhandlingRS2.mem", imem); 
     `define REGISTER_FILE_CHECK \
-    $display("check RAW HANDLING RS2");\
-    `assert(registers[2] == 32'h40)
+    assert(registers[2] == 32'h40) $display("RAW HANDLING RS2 Passed");\
+    else $display("RAW HANDLING RS2 Failed");
     `define PASS_CONDITION (registers[2] == 32'h40)
     
 `elsif TEST_BRANCH_STALL 
-    `define INSTRUCTION_MEMORY_SETTING \
-    $readmemh("BranchStall.mem", imem); // Register 2 <- 0x03
+    // Register 2 <- 0x03
+    `define INSTRUCTION_MEMORY_SETTING $readmemh("BranchStall.mem", imem); 
     `define REGISTER_FILE_CHECK \
-    $display("check BRANCH STALL");\
-    `assert(registers[2] == 32'h03)
+    assert(registers[2] == 32'h03) $display("BRANCH STALL Passed");\
+    else $display("BRANCH STALL Failed");
     `define PASS_CONDITION (registers[2] == 32'h3)
     
 `elsif TEST_BRANCH_STALL_TAKEN 
-    `define INSTRUCTION_MEMORY_SETTING \
-    $readmemh("BranchStallTaken.mem", imem); // Register 1 <- 0x06
+    // Register 1 <- 0x06
+    `define INSTRUCTION_MEMORY_SETTING $readmemh("BranchStallTaken.mem", imem); 
     `define REGISTER_FILE_CHECK \
-    $display("check BRANCH STALL TAKEN");\
-    `assert(registers[1] == 32'h06)
+    assert(registers[1] == 32'h06) $display("BRANCH STALL TAKEN Passed");\
+    else $display("BRANCH STALL TAKEN Failed");
     `define PASS_CONDITION (registers[2] == 32'h06)
     
 `else
-    `define INSTRUCTION_MEMORY_SETTING $display("Memory Setting None");
+    `define INSTRUCTION_MEMORY_SETTING $display("No Program for Instruction Memory Specified");
     
-    `define REGISTER_FILE_CHECK $display("check None");
+    `define REGISTER_FILE_CHECK $display("No Register File Check Specified");
     
     `define PASS_CONDITION (1)
 
