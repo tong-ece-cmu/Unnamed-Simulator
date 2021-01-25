@@ -1,6 +1,6 @@
 `define SIMULATION_FINISH_TIME 600
 
-`define TEST_LOAD_STORE 1
+//`define TEST_LOAD_STORE 1
 //`define TEST_INST1 1
 //`define TEST_RAW_HANDLING2 1
 //`define TEST_RAW_HANDLING3 1

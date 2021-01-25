@@ -1,3 +1,5 @@
+# Arch#3 Notes
+
 This is Architecture #3 development notes.
 
 This architecture model will focus on the memory hierarchy. Double core, pipelined processor.
@@ -60,6 +62,8 @@ The cache will wait while dram_ready is low. After dram_ready is high, the count
 
 Now, the Cache module has a counter, the counter will move to working state if there is a cache miss on load or store. If there isn't, the memory result will take the cache data and move on. The counter will move to state 2 when there DRAM is ready. Then the cache will write the data block to dram, or read data block from dram depends on the opcode. After the block operation is finished, the memory result will take the appropriate data bytes on read, the cache treat DRAM as Little Endian.
 
+# Cache Write Strategy
+
 There are a few cases we need to think about. When we have a LOAD instruction and cache hit. When we have a LOAD instruction and cache miss. When we have a Store instruction and cache hit. When we have a Store instruction and cache miss.
 
 PLAN A
@@ -99,6 +103,18 @@ We need to find a way to initialize all valid bit to zero. And since we are usin
 Ok, we can just declare Valid bits as one 128bit register not as memory. We can reset it by assigning zero. To get one bit high, we can use some bit manipulation to flip that bit:
 
 ```valid_next = valid | (1 << index_field);``` 
+# Read after Load RAW
+
+For the special case of RAW hazard, where there is a read after load. We need to insert NOP. We first check whether there is actually a RAW hazard for both RS1 and RS2, then we check if there is a load instruction been executed. If it is, we need to insert NOP(By the way, this is a lot of combination logic, we may need to have five stages after all). We also need a state machine, a counter. At the idling stage, we check for RAW hazard and generate the forwarding signals. If there is a RAW for load, we insert NOP and generate zero for the forwarding signals. We also need to handle the register file read signal generation. The read and address is from the instruction. We can change the instruction in the beginning, so we don't need to handle the rest. We also need to handle the PC, if we are inserting NOP, then PC needs to keep its original value. 
+
+What if we get a freeze CPU? We want to PC to stay the same, exe_inst to stay the same, and forwarding signal to stay the same. In each stage of the counter, we can put a if statement to check freeze cpu, if freeze_cpu, we don't change state and keep the output value the same. 
+
+Change of plan, the counter will go to one when there is a one step raw for LOAD. And the existing logic will take that as input and do their thing. So we can keep all the existing code without rewriting the whole thing. 
+
+Everything works beautifully.
+
+
+# Branching
 
 
 

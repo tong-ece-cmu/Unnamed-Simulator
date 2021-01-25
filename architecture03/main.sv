@@ -57,16 +57,17 @@ module main(
     
     DRAM dram_module(.*);
 //    Data_Memory data_memory_module(.*);
-    
+    integer i=0;
     initial
     begin
-        
+	if($test$plusargs("ss"))
+            $display("yes");
         clk <= 0;
         rst <= 1;
         #10 rst <= 0;
 
         `include "verification.svh"
-        #`SIMULATION_FINISH_TIME $finish;            // Quit the simulation
+        #`SIMULATION_FINISH_TIME $stop;            // $finish to Quit the simulation
         
         
     end
@@ -119,10 +120,11 @@ output reg [1:0] exe_rs1_forward,
 output reg [1:0] exe_rs2_forward
 );
 
+logic [31:0] inst_for_rf;
 logic[31:0] PC_next;
 logic[31:0] exe_inst_next;
-assign addr1 = inst[19:15];
-assign addr2 = inst[24:20];
+
+wire exe_is_load = (exe_inst[6:0] ==   7'b0000011);  // LOAD (Load to Register) Spec. PDF-Page 42 )
 
 wire need_rs1 =     //                  7'b0110111 // LUI (Load Upper Immediate) Spec. PDF-Page 37 
                     //                  7'b0010111 // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
@@ -169,20 +171,60 @@ wire next_next_inst_need_rd = (mem_inst[6:0] ==   7'b0110111) // LUI (Load Upper
                 ||  (mem_inst[6:0] ==   7'b0110011)  // OP (Integer Register-Register Instructions) Spec. PDF-Page 37 )
                 ;
 
-assign rd1 = !freeze_cpu && need_rs1;
-assign rd2 = !freeze_cpu && need_rs2;
-
 wire [4:0] next_inst_rd_addr = exe_inst[11:7];
 wire [4:0] next_next_inst_rd_addr = mem_inst[11:7];
 logic [1:0] rs1_forward_next;
 logic [1:0] rs2_forward_next;
 
+wire [4:0] addr1_inst = inst[19:15];
+wire [4:0] addr2_inst = inst[24:20];
+wire need_rs1_n0 = need_rs1 && (addr1_inst != 0);
+wire need_rs2_n0 = need_rs2 && (addr2_inst != 0);
+
+wire is_rs1_one_step_raw = need_rs1_n0 && next_inst_need_rd && (addr1_inst == next_inst_rd_addr);
+wire is_rs2_one_step_raw = need_rs2_n0 && next_inst_need_rd && (addr2_inst == next_inst_rd_addr);
+wire is_rs1_two_step_raw = need_rs1_n0 && next_next_inst_need_rd && (addr1_inst == next_next_inst_rd_addr);
+wire is_rs2_two_step_raw = need_rs2_n0 && next_next_inst_need_rd && (addr2_inst == next_next_inst_rd_addr);
+
+reg [7:0] counter;
+logic [7:0] counter_next;
+
+assign rd1 = counter_next == 1 || (!freeze_cpu && need_rs1);
+assign rd2 = !freeze_cpu && need_rs2;
+
+assign addr1 = counter_next == 1 ? 0 : addr1_inst; // NOP for read after load need to read r0
+assign addr2 = counter_next == 1 ? 0 : addr2_inst; // NOP for read after load need to read r0
+
+always_comb begin
+    if (rst)    counter_next = 0;
+    else if (freeze_cpu) begin
+        counter_next = counter;
+    end
+    else if (counter == 0) begin
+        if ((is_rs1_one_step_raw || is_rs2_one_step_raw) && exe_is_load) begin
+            counter_next = 1;
+        end
+        else begin
+            counter_next = 0;
+        end
+    end
+    else if (counter == 1) begin
+        counter_next = 0;
+    end
+    else begin
+        counter_next = 0;
+    end
+end
+
+
 always_comb begin
     if (freeze_cpu)
         rs1_forward_next = exe_rs1_forward;
-    else if ((addr1 != 0) && next_inst_need_rd && need_rs1 && (addr1 == next_inst_rd_addr))
+    else if (counter_next == 1)
+        rs1_forward_next = 0; // forward for NOP is none
+    else if (is_rs1_one_step_raw)
         rs1_forward_next = 1;
-    else if ((addr1 != 0) && next_next_inst_need_rd && need_rs1 && (addr1 == next_next_inst_rd_addr))
+    else if (is_rs1_two_step_raw)
         rs1_forward_next = 2;
     else
         rs1_forward_next = 0;
@@ -191,41 +233,28 @@ end
 always_comb begin
     if (freeze_cpu)
         rs2_forward_next = exe_rs2_forward;
-    else if ((addr2 != 0) && next_inst_need_rd && need_rs2 && (addr2 == next_inst_rd_addr))
+    else if (counter_next == 1)
+        rs2_forward_next = 0; // forward for NOP is none
+    else if (is_rs2_one_step_raw)
         rs2_forward_next = 1;
-    else if ((addr2 != 0) && next_next_inst_need_rd && need_rs2 && (addr2 == next_next_inst_rd_addr))
+    else if (is_rs2_two_step_raw)
         rs2_forward_next = 2;
     else
         rs2_forward_next = 0;
 end
 
 
-//reg [7:0] counter;
-//logic [7:0] counter_next;
-//wire is_one_step_raw = (addr1 != 0) && next_inst_need_rd && need_rs1 && (addr1 == next_inst_rd_addr);
-//wire need_NOP_after_LOAD = is_one_step_raw && (exe_inst[6:0] ==   7'b0000011);  // LOAD (Load to Register) Spec. PDF-Page 42 )
-//always_ff @(posedge clk) begin
-//    counter <= counter_next;
-//end
-//always_comb begin
-//    if (rst)    counter_next = 0;
-//    else if (counter == 0 && need_NOP_after_LOAD)  // LOAD (Load to Register) Spec. PDF-Page 42 )
-//        counter_next = 1;
-//    else
-//        counter_next = 0;
-//end
-
-
-
 always_comb begin
     if (rst)                PC_next = 0;
     else if (freeze_cpu)    PC_next = PC;
+    else if (counter_next == 1) PC_next = PC; // NOP for read after load
     else                    PC_next = PC + 4;
 end
 
 always_comb begin
     if (rst)        exe_inst_next = 32'h00000013;
     else if (freeze_cpu) exe_inst_next = exe_inst;
+    else if (counter_next == 1) exe_inst_next = 32'h00000013; // NOP for read after load
     else            exe_inst_next = inst;
 end
 
@@ -234,6 +263,7 @@ always_ff @(posedge clk) begin
     exe_inst <= exe_inst_next;
     exe_rs1_forward <= rs1_forward_next;
     exe_rs2_forward <= rs2_forward_next;
+    counter <= counter_next;
 end
 
 endmodule : InstructionDecode

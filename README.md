@@ -3,16 +3,17 @@
 
 Here stores different CPU designs and their design notes; Experiments with different hardware description languages, Verilog, System C, and System Verilog; Experiments with different hardware design techniques, data forwarding, automated verification, etc. 
 
-## Microarchitectures (The Latest & Greatest on the top)
+## Microarchitectures
 
-**architecture03** is a four-stage pipelined RISC-V RV32I CPU written in System Verilog with data forwarding to minimize stall. 
+**architecture03** is a four-stage pipelined RISC-V RV32I CPU written in System Verilog with data forwarding to minimize stall. See [Wiki](https://github.com/tong-ece-cmu/Unnamed-Simulator/wiki/Architecture-%233) for detail.
 
 - [Completed] Data Forwarding
 - [Completed] Memory module with delay
 - [Completed] Automated Assertion Test Cases Checking
 - [Completed] 4kB Direct-Mapped Cache - 32 bytes Block Size
-- [TODO] Data Forwarding Special Case
-- [TODO] Branching
+- [Completed] Data Forwarding Special Case - Read after Load
+- [Happening] Create Tcl(do) Script for Test Automation
+- [TODO] Branching + Predictor
 - [TODO] More Assembly Programs for Testing
 - [TODO] Dual Core
 
@@ -23,7 +24,9 @@ Here stores different CPU designs and their design notes; Experiments with diffe
 
 ## Tool box
 
-**assembler.py** is a RISC-V assembler I wrote. It compiles assembly into machine code in mem file format. I used it to compile assembly test cases. Create a new program string in the python script, point the asem variable to the new program string, and hit the run button of your python IDE to print machine code in console.
+**assembler.py** is a RISC-V assembler I wrote. It compiles assembly into machine code in mem file format. I used it to compile assembly test cases. Create a new program string in the python script, point the asem variable to the new program string, and hit the run button of your python IDE to print machine code in console. See [Wiki](https://github.com/tong-ece-cmu/Unnamed-Simulator/wiki/RISC-V-Assembler) for detail.
+
+**Spyder (Anacoda Python)** is the Python IDE I currently use, it has a nice GUI to show all the declared variables and their values.
 
 **SIEMENS ModelSim PE Student Edition** is the simulator I currently use.
 
