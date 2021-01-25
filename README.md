@@ -5,12 +5,12 @@ Here stores different CPU designs and their design notes; Experiments with diffe
 
 ## Microarchitectures
 
-**architecture03** is a four-stage pipelined RISC-V RV32I CPU written in System Verilog with data forwarding to minimize stall. See [Wiki](https://github.com/tong-ece-cmu/Unnamed-Simulator/wiki/Architecture-%233) for detail.
+**architecture03** is a four-stage pipelined RISC-V RV32I CPU written in System Verilog with data forwarding to minimize stall. And 4KiB Direct-Mapped Cache. See [Wiki](https://github.com/tong-ece-cmu/Unnamed-Simulator/wiki/Architecture-%233) for detail.
 
 - [Completed] Data Forwarding
 - [Completed] Memory module with delay
 - [Completed] Automated Assertion Test Cases Checking
-- [Completed] 4kB Direct-Mapped Cache - 32 bytes Block Size
+- [Completed] 4KiB Direct-Mapped Cache - 32 bytes Block Size
 - [Completed] Data Forwarding Special Case - Read after Load
 - [Happening] Create Tcl(do) Script for Test Automation
 - [TODO] Branching + Predictor
