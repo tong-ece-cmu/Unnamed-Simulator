@@ -116,9 +116,33 @@ Everything works beautifully.
 
 # Branching
 
+# Do scripts
+
+Do script is used for automated compiling and running simulation. I can pass in parameter to simulator. And in the system verilog code, I can create a module that will test on the parameter and run different test cases specified by the parameter. The module that test the parameter need to reside in the register file module or instruction memory module. Otherwise, readmem won't work.
+
+Can we use bind to insert a module into register file? Yes, we can use bind to insert module into other module. But we can't use assertion. Assertion is not supported in the student edition of ModelSim. Covergroup is also not supported, it outright stops the simulation.
+
+Direct Programming Interface seems to be a possible path. We can can c function from system verilog and let the c function to handle the function coverage.
+
+Or we can just write some system verilog code that will keep track of it. Using counter and such. 
 
 
-# Off the side notes
+# side notes #4
+
+I found something on PCIe : https://www.cl.cam.ac.uk/~djm202/pdf/specifications/pcie/PCI_Express_Base_Rev_2.0_20Dec06a.pdf
+
+# side notes #3
+
+electromagnetic field solver is instersting. Maybe use cuda to accelerate it. Some interesting Cuda Application: https://www.nvidia.com/en-us/gpu-accelerated-applications/
+
+
+# Side notes #2
+
+Try system verilog coverage function. As a start, we can put coverage on the instructions. So we can see how much instructions are covered. Then we can put coverage on register file and DRAM to see how much regions of memory or register file is covered. Those are not very insteresting. As they can be acheived with the assertion. More interesting case would be coverage for all the hiden wires in the module. State machine states coverage. Make sure to exercise every part of the design. Use illegal bin in coverage to make sure no invalid signals. Coverage seems to need interface and class language construct.
+
+Assertion binding, from online document, this is the way to separate assertion and verification code from the design code.
+
+# Off the side notes #1
 Try ModelSim PE SE, it has assertion support, supposedly better than Vivado simulator.
 
 https://www.mentor.com/company/higher_ed/modelsim-student-edition
