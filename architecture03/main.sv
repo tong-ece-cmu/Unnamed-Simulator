@@ -18,33 +18,14 @@
 // Additional Comments:
 // 
 //////////////////////////////////////////////////////////////////////////////////
-module main_verification(
-input wire clk,
-input [15:0] clk_counter
-);
-    wire clk_ss;
-    initial begin
-        #10 $display("from test module");
-    end
-    
-    assert property (                                  
-        @(posedge clk)       // sampling event
-            clk |-> ##20 clk                             // expression to check
-        )
-        else                                        // (optional) error message
-            $error("%m bad clock");
-    
-    covergroup clkcover @ (posedge clk);
-        coverpoint clk_counter;
-    endgroup
-
-endmodule
 
 
 module main(
+input clk,
+input rst
     );
-    reg clk, rst;
-    always #5 clk = ~clk;  // Create clock with period=10
+    //reg clk, rst;
+    //always #5 clk = ~clk;  // Create clock with period=10
     
     // Register File
     wire [4:0] addr1, addr2, addr3;
@@ -78,8 +59,8 @@ module main(
     
     DRAM dram_module(.*);
 //    Data_Memory data_memory_module(.*);
-    bind RegisterFile main_verification assert_bind_ip_instance(.*);
-
+    //bind RegisterFile main_verification assert_bind_ip_instance(.*);
+/*
     integer i=0;
     initial
     begin
@@ -94,7 +75,7 @@ module main(
         
         
     end
-    
+    */
 endmodule : main
 
 // ----------------------------------------------------------------------------------------

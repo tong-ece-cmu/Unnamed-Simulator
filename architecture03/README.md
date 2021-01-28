@@ -120,20 +120,37 @@ Everything works beautifully.
 
 Do script is used for automated compiling and running simulation. I can pass in parameter to simulator. And in the system verilog code, I can create a module that will test on the parameter and run different test cases specified by the parameter. The module that test the parameter need to reside in the register file module or instruction memory module. Otherwise, readmem won't work.
 
-Can we use bind to insert a module into register file? Yes, we can use bind to insert module into other module. But we can't use assertion. Assertion is not supported in the student edition of ModelSim. Covergroup is also not supported, it outright stops the simulation.
+Can we use bind to insert a module into register file? Yes, we can use bind to insert module into other module. But we can't use assertion. Assertion is not supported in the student edition of ModelSim. Covergroup is also not supported, it outright stops the simulation. Randomize is also not supported. We can use python to generate random test instructions. Need an ISA simulator first and cross checking with the Cornell one first.
 
 Direct Programming Interface seems to be a possible path. We can can c function from system verilog and let the c function to handle the function coverage.
 
-Or we can just write some system verilog code that will keep track of it. Using counter and such. 
+Or we can just write some system verilog code that will keep track of it. Using counter and such.
+
+We can put verification code in completely separate files now, that's fantastic. Let's do that first, then we can do some magic to get some coverage.  
+
+Actually, we can't initialize things in the separate file. For example, we can't initialize the instruction memory in verification file. We don't seem to have write access using bind. 
+
+That means we can only put register file verification code in separate file. And the new counter code for coverage. Or, how about we just put the instruction memory module in verification file all together. 
+
+We need to use $test$plusargs to automate the process of running different test cases, which means, we will not use macros to setup the test cases. We will move the instruction memory to verification module, since there isn't much in there anyway. But we will create test module which is binded to register file to check results, and count cycles. 
+
+We are going to write a Python script which will generate random tests and it will generate test ground truth. And it will parse log file output from simulation to get coverage detail. We can create a counter with string parameter. We are going to create a counter and tell it what to keep track off. And it will printout the details in the end. Then python will parse it and write a report.
+
 
 
 # side notes #4
 
 I found something on PCIe : https://www.cl.cam.ac.uk/~djm202/pdf/specifications/pcie/PCI_Express_Base_Rev_2.0_20Dec06a.pdf
 
+PCIe is kind complex and hard protocol, also USB. It will need a lot of time. There are some simplier protocol like AXI.
+
 # side notes #3
 
 electromagnetic field solver is instersting. Maybe use cuda to accelerate it. Some interesting Cuda Application: https://www.nvidia.com/en-us/gpu-accelerated-applications/
+
+Maybe use DirectX instead, it has more support, and more tools available from Microsoft. Trying to build on existing tools without knowledge from the previous tool developer is going to be harder than starting from scratch.
+
+Cuda seems to be good too... But I don't have Nvidia card, so we will stick with directx for now.
 
 
 # Side notes #2

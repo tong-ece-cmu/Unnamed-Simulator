@@ -264,17 +264,6 @@ always_ff @(posedge clk) begin
     block_addr_counter <= block_addr_counter_next;
 end
 
-integer i;
-initial begin
-    /*
-    // Initialize all valid bit to zero, implement it later
-    for (i=0; i<128; i=i+1) begin
-        valid[i] <= 0;
-        
-    end
-    */
-
-end
 
 endmodule : Cache
 
@@ -517,60 +506,5 @@ always_ff @ (posedge clk) begin
 	
 end
 
-`include "verification.svh"
-
-reg[15:0] clk_counter;
-reg is_finished;
-always #10 begin
-    clk_counter <= clk_counter + 1; 
-    if (`PASS_CONDITION && !is_finished) begin
-        $display("cycle count %d", clk_counter);
-        is_finished <= 1;
-    end
-end
-initial begin
-    is_finished = 0;
-    clk_counter = 0;
-    
-    
-    
-    #`SIMULATION_FINISH_TIME;
-    `REGISTER_FILE_CHECK
-    
-end
-
-
 endmodule : RegisterFile
 
-
-module InstructionMemory(
-input clk,
-input [31:0] PC,
-output [31:0] inst
-);
-
-parameter DATA_WIDTH = 8, DEPTH = 256;
-reg [DATA_WIDTH-1:0] imem [DEPTH-1:0];
-
-assign inst = {imem[PC+3], imem[PC+2], imem[PC+1], imem[PC]};
-
-integer i = 0;
-initial begin
-    
-    // Initialize every instruction to NOP
-    for (i=0; i<DEPTH; i=i+4) begin
-        
-        imem[i+0] = 8'h13; 
-        imem[i+1] = 8'h00;
-        imem[i+2] = 8'h00;
-        imem[i+3] = 8'h00;
-        
-    end
-    
-    // Load test instructions
-    `include "verification.svh"
-    `INSTRUCTION_MEMORY_SETTING
-end
-
-
-endmodule : InstructionMemory
