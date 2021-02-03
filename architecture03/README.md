@@ -138,6 +138,30 @@ We are going to write a Python script which will generate random tests and it wi
 
 
 
+# System Verilog Class
+
+Here is the syntax for it: https://www.chipverify.com/systemverilog/systemverilog-class
+
+Ok, we hope to generate test cases and check architecture using the class construct. So we don't need to go through python and tcl scripts. 
+
+To generate test cases is kind complicated. Assembler is ok, but compiler is much more complicated. Maybe we can just write an assembler and generate random scripts of assembly code and run that. So we are not having an actual usable, or existing program. The random scripts actually should be better. As it will exercise chip that human programmer will never do. 
+
+The checker part is easier. It's just an ISA simulator. It's quite similar to the ALU or datapath. But it doesn't have all the control signals. It's purely sequential code. Operate assembly instructions line by line. 
+
+It's interesting to think about. The only difference between our C++ like ISA simulator and System verilog architecture is the degree of parallism. We can do ISA simulator style in System Verilog, but it will be slow, low throughput. As we are waiting for decoding, read register file, datapath execute, memory access and write back all for one instruction. 
+
+We can tolerate the low parallism of ISA simulator, as the primary goal of it is to be correct. 
+
+We first need to generate random assembly code, then we write the checker for it.
+
+Let's first do one or three assembly instruction. Generate random ordering of them, random amount of them, each having random arguments.
+
+Then create a checker. Each instruction should just be a function, or a case in a big switch statement. 
+
+
+# side notes #5
+check the class feature of system verilog, we can implement the assembler and checker in there.
+
 # side notes #4
 
 I found something on PCIe : https://www.cl.cam.ac.uk/~djm202/pdf/specifications/pcie/PCI_Express_Base_Rev_2.0_20Dec06a.pdf
