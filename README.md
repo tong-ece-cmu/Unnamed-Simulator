@@ -12,7 +12,7 @@ Here stores different CPU designs and their design notes; Experiments with diffe
 - [Completed] Automated Assertion Test Cases Checking
 - [Completed] 4KiB Direct-Mapped Cache - 32 bytes Block Size
 - [Completed] Data Forwarding Special Case - Read after Load
-- [Happening] Create Tcl(do) Script for Test Automation
+- [Paused] Create Tcl(do) Script for Test Automation
 - [TODO] Branching + Predictor
 - [TODO] More Assembly Programs for Testing
 - [TODO] Dual Core
@@ -24,7 +24,7 @@ Here stores different CPU designs and their design notes; Experiments with diffe
 
 ## Tool box
 
-**assembler.py** is a RISC-V assembler I wrote. It compiles assembly into machine code in mem file format. I used it to compile assembly test cases. Create a new program string in the python script, point the asem variable to the new program string, and hit the run button of your python IDE to print machine code in console. See [Wiki](https://github.com/tong-ece-cmu/Unnamed-Simulator/wiki/RISC-V-Assembler) for detail.
+**assembler.py** is a RISC-V assembler I wrote in Python. It compiles assembly into machine code in mem file format. I used it to compile assembly test cases. Create a new program string in the python script, point the asem variable to the new program string, and hit the run button of your python IDE to print machine code in console. See [Wiki](https://github.com/tong-ece-cmu/Unnamed-Simulator/wiki/RISC-V-Assembler) for detail.
 
 **Spyder (Anacoda Python)** is the Python IDE I currently use, it has a nice GUI to show all the declared variables and their values.
 
