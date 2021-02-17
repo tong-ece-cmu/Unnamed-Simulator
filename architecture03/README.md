@@ -116,6 +116,29 @@ Everything works beautifully.
 
 # Branching
 
+Ok, branching. 
+
+First of, what PC modifying instruction do we have? Branching instruction and jump instruction.
+
+The result of those PC modification will be ready after the execute stage. So we have decode stage and execute stage. After execute stage, which is the third clock edge, we have our new PC ready.
+
+
+So, the easiest design is to have stall when meeting a branching code. Unpause CPU when the branching code has been resolved.
+
+The better design is to have branch take one path, and if predict wrong, roll back all changes. Take one path, we need to record that we are doing this, so we can roll back later. At the execute stage, before the third clock edge, we need to compare execute result with our prediction. If predication in correct, flush the decoded instruction. Clock in NOP for the first flip-flop and execute state input flip-flop. 
+
+Currently the Instruction memory is super simplified. At the clock edge when PC is clocked in, the instruction is immediately fetched. So everything is assumed to be happending at the clock edge, both PC ready and instruction fetch.
+
+So after first clock edge, if it's a branch instruction. Then state machine next state is 1. Next PC is the predicted PC. At second clock edge, start executing branch. Near the end of the period, if branch result match with predication, next state is 0. Else, execute stage clock in NOP, next PC is the new PC.
+
+Another state machine for the branch instruction one after another. If it's a branch instruction and first state machine is busy, if we didn't get a flush, do the same thing.
+
+
+We need to consider if there are consequetive branch instructions.
+
+
+
+
 # Do scripts
 
 Do script is used for automated compiling and running simulation. I can pass in parameter to simulator. And in the system verilog code, I can create a module that will test on the parameter and run different test cases specified by the parameter. The module that test the parameter need to reside in the register file module or instruction memory module. Otherwise, readmem won't work.
