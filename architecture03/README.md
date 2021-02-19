@@ -133,11 +133,19 @@ So after first clock edge, if it's a branch instruction. Then state machine next
 
 Another state machine for the branch instruction one after another. If it's a branch instruction and first state machine is busy, if we didn't get a flush, do the same thing.
 
-
 We need to consider if there are consequetive branch instructions.
 
+The test vector would just be an assembly if statement. We will run through it and see if it produce the correct result. This is already been done, we have the test vectors from the previous architecture.
 
+Right now, we are missing things for execute stage. We are missing the entire branch instruction execute, and write pc wires. Write PC wire will get calculated during the execute stage. The result will get clocked in into the decoder PC register in the next clock edge.
 
+There are some logic in the decoder that's related to PC. We have reset, freeze_cpu and counter next. Reset is straight forward. Freeze cpu is for pausing the CPU for cache memory access. Counter next is for inserting NOP for read after load. 
+
+We are really just having performance benefit of one clock cycle when doing prediction. The reading register file takes one cycle, then we have the next PC sorted out. Oh well, let's do it for completenss sake. 
+
+So instead of having to calculate PC in decoder, we will always take value from the execute stage. And execute stage will always output +4 PC. It will output correct PC value if there is a branch or jump instruction.
+
+We are missing the whole block that generate the newPC output. So this block will have if statements to check whether its a branch insturction(all its sub instruction BEQ, BNEQ, etc), or jump. And in the if statement, assign new appropriate PC. That new PC will be type logic, not wire or reg. Need to check ISA specification on the detail of branch and jump instruction. They may also want to store address in register file. Then we can also reference things from previous architecture. 
 
 # Do scripts
 

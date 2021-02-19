@@ -76,18 +76,18 @@ always_comb
 begin
     if (freeze_cpu)
         exe_result_next <= exe_result;
-	else if (opcode == 7'b0110111) // LUI (Load Upper Immediate) Spec. PDF-Page 37 )
-	    exe_result_next <= imm_U;
-	else if (opcode == 7'b0010111) // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
-	    exe_result_next <= imm_U + PC;
-	else if (opcode == 7'b1101111) // JAL (Jump And Link) Spec. PDF-Page 39 )
-	    exe_result_next <= PC_next;
+    else if (opcode == 7'b0110111) // LUI (Load Upper Immediate) Spec. PDF-Page 37 )
+	exe_result_next <= imm_U;
+    else if (opcode == 7'b0010111) // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
+        exe_result_next <= imm_U + PC;
+    else if (opcode == 7'b1101111) // JAL (Jump And Link) Spec. PDF-Page 39 )
+        exe_result_next <= PC_next;
 //	    wr_pc <= {{11{immediate[19]}}, immediate, 1'b0} + PC;
-	else if (opcode == 7'b1100111) // JALR (Jump And Link Register) Spec. PDF-Page 39 )
-	    exe_result_next <= PC_next;
+    else if (opcode == 7'b1100111) // JALR (Jump And Link Register) Spec. PDF-Page 39 )
+        exe_result_next <= PC_next;
 //	    wr_pc <= {{20{immediate[11]}}, immediate[11:1], 1'b0} + rs1_data; // it needs LSB to be zero
 	
-	else if (opcode == 7'b0100011) // STORE (Store to Memory) Spec. PDF-Page 42 )
+    else if (opcode == 7'b0100011) // STORE (Store to Memory) Spec. PDF-Page 42 )
         exe_result_next <= rs2_data;
         
     if (opcode == 7'b0010011) // OP_IMM (Integer Register-Immediate Instructions) Spec. PDF-Page 36 )
