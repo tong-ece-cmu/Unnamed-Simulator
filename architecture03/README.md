@@ -125,7 +125,7 @@ The result of those PC modification will be ready after the execute stage. So we
 
 So, the easiest design is to have stall when meeting a branching code. Unpause CPU when the branching code has been resolved.
 
-The better design is to have branch take one path, and if predict wrong, roll back all changes. Take one path, we need to record that we are doing this, so we can roll back later. At the execute stage, before the third clock edge, we need to compare execute result with our prediction. If predication in correct, flush the decoded instruction. Clock in NOP for the first flip-flop and execute state input flip-flop. 
+The better design is to have branch take one path, and if predict wrong, roll back all changes. Take one path, we need to record that we are doing this, so we can roll back later. At the execute stage, before the third clock edge, we need to compare execute result with our prediction. If predication incorrect, flush the decoded instruction. Clock in NOP for the first flip-flop and execute state input flip-flop. 
 
 Currently the Instruction memory is super simplified. At the clock edge when PC is clocked in, the instruction is immediately fetched. So everything is assumed to be happending at the clock edge, both PC ready and instruction fetch.
 
@@ -146,6 +146,71 @@ We are really just having performance benefit of one clock cycle when doing pred
 So instead of having to calculate PC in decoder, we will always take value from the execute stage. And execute stage will always output +4 PC. It will output correct PC value if there is a branch or jump instruction.
 
 We are missing the whole block that generate the newPC output. So this block will have if statements to check whether its a branch insturction(all its sub instruction BEQ, BNEQ, etc), or jump. And in the if statement, assign new appropriate PC. That new PC will be type logic, not wire or reg. Need to check ISA specification on the detail of branch and jump instruction. They may also want to store address in register file. Then we can also reference things from previous architecture. 
+
+``` SystemVerilog
+wire pc_offset = inst[15:32] // check the offset field in instruction
+localparam true = 1'b1, false = 1'b0;
+localparam NOP = 32'h0011010; // check the NOP instruction in RISC-V
+wire predict = true;
+wire [31:0] predict_PC = (predict == true) ? PC + pc_offset : PC + 4;
+reg [31:0] predict_PC_saved;
+wire is_branch = inst[6:0] == 7'b1011101;
+
+wire pc_caculated; // coming from execute unit
+
+logic [31:0] next_PC;
+
+reg [7:0] state;
+logic [7:0] next_state;
+logic wrong_predication = (state == 1) && (pc_caculated != predict_PC_saved);
+
+// ---------- below need some merging with existing code -----------
+always_comb begin
+    if (wrong_predication) begin
+        next_inst_to_exe = NOP;
+    end
+    else begin
+        next_inst_to_exe = inst;
+    end
+end
+// ---------- above need some merging with existing code -----------
+
+always_comb begin
+    if (state == 0) begin
+        if (is_branch) begin
+            next_state = 1;
+            next_PC = predict_PC;
+        end
+        else begin
+            next_state = state;
+            next_PC = PC + 4;
+        end
+    end
+    else if (state == 1) begin
+        next_state = 0;
+        if (pc_caculated == predict_PC_saved) begin
+            next_PC = PC + 4;
+        end
+        else begin
+            next_PC = pc_caculated;
+        end
+    end
+    else begin
+        next_state = state;
+        next_PC = PC + 4;
+    end
+
+end
+
+always_ff @(posedge clk) begin
+    predict_PC_saved <= predict_PC;
+    state <= next_state;
+    PC <= next_PC;
+
+end
+
+
+```
 
 # Do scripts
 
