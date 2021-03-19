@@ -32,5 +32,3 @@ restart -force
 run -all
 
 
-# write transcript barlog.txt, it will be in the same folder as system verillog file
-write transcript barlog.txt

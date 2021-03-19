@@ -70,6 +70,21 @@ ADDI x1, x1, 4
 ADDI x1, x1, 1
 NOP'''
 
+library = [
+{"name":"BranchStall", 
+"code":'''ADDI x1, x0, 1
+BEQ x0, x1, 12
+ADDI x1, x1, 2
+JAL x0, 8
+ADDI x1, x1, 4
+NOP'''},
+
+{"name":"inst1", 
+"code":'''NOP
+ADDI x2, x0, 32
+ADDI x2, x2, 32'''},
+]
+
 p2 = '''ADDI x1, x0, 3
 ADDI x1, x1, 1
 ADDI x1, x1, 2
@@ -87,9 +102,12 @@ XORI X1, x1, 2
 '''
 # f = open('..\\HighLevelLanguageTests\\addition.assembly', "r")
 # f = open('..\\HighLevelLanguageTests\\branch.assembly', "r")
+# f = open('HighLevelLanguageTests\\branch.assembly', "r")
 # asem = f.read()
-
-asem = p4
+program = library[1]
+mem_dir = "HighLevelLanguageTests"
+asem = program["code"]
+print("Assembling "+program["name"])
 
 # for each line
     # get list of tokens, split string on space and comma
@@ -215,7 +233,23 @@ def printHex(mc):
         print("{0:#0{1}x}".format((mc >> 8*i) & 0xFF,4))
     print("")
 
-def printModelSimHex(mc):
+def printModelSimHex(mc, f=None):
+    '''
+    We are using little endian memory. So the least significant byte will be 
+    in the lowest address. When generating binary code. We will write the 
+    least significant byte first as it will be loaded into the lowest address 
+    first.
+
+    Parameters
+    ----------
+    mc : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    '''
     # {   # Format identifier
     # 0:  # first parameter
     # #   # use "0x" prefix
@@ -224,27 +258,51 @@ def printModelSimHex(mc):
     # x   # hexadecimal number, using lowercase letters for a-f
     # }   # End of format identifier
     # https://stackoverflow.com/questions/12638408/decorating-hex-function-to-pad-zeros
-    for i in range(4):
-        print("{0:0{1}x}".format((mc >> 8*i) & 0xFF,2))
-    print("")
-
-for s in asem.splitlines():
-    tokens = re.split(', +| |,', s)
-    if tokens[0][0] == ';':
-        continue
-    oprd = getOperands(tokens)
-    mc = getMachineCode(tokens, oprd)
     
-    if assembler_target == TargetOptions.VivadoMem:
-        printHex(mc)
-    elif assembler_target == TargetOptions.SystemcArray:
-        printInstArray(mc)
-    elif assembler_target == TargetOptions.ModelSimMem:
-        printModelSimHex(mc)
+    for i in range(4):
+        mcByte = "{0:0{1}x}".format((mc >> 8*i) & 0xFF,2)
+        if f != None:
+            f.write(mcByte+"\n")
+        else:
+            print(mcByte)
+    
+    if f != None:
+        f.write("\n")
     else:
-        print("Invalid Output Option")
+        print("")
+    
+    
 
 
+
+
+
+def generateBinaryCode(asem, f=None):
+    for s in asem.splitlines():
+        tokens = re.split(', +| |,', s)
+        if tokens[0][0] == ';':
+            continue
+        oprd = getOperands(tokens)
+        mc = getMachineCode(tokens, oprd)
+        
+        if assembler_target == TargetOptions.VivadoMem:
+            printHex(mc)
+        elif assembler_target == TargetOptions.SystemcArray:
+            printInstArray(mc)
+        elif assembler_target == TargetOptions.ModelSimMem:
+            printModelSimHex(mc, f)
+        else:
+            print("Invalid Output Option")
+
+
+NoFile = False
+
+if NoFile:
+    generateBinaryCode(asem)
+else:
+    f = open(mem_dir+"\\"+program["name"]+".mem", "w")
+    generateBinaryCode(asem, f) 
+    f.close()
 
 
 

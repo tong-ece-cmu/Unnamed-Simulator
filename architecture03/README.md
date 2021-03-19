@@ -212,6 +212,10 @@ end
 
 ```
 
+# Instruction Fetch stage
+
+Maybe we should add a instruction fetch stage. It will fetch instruction from memory, just like the data memory stage. The program will reside near the top of the address space while heap is near the bottom of the address space. By top, I mean the address number is bigger. And they can even share the same cache.
+
 # Do scripts
 
 Do script is used for automated compiling and running simulation. I can pass in parameter to simulator. And in the system verilog code, I can create a module that will test on the parameter and run different test cases specified by the parameter. The module that test the parameter need to reside in the register file module or instruction memory module. Otherwise, readmem won't work.
