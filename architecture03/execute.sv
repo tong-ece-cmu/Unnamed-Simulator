@@ -23,7 +23,7 @@
 module Execute (
 input clk,
 input rst,
-input [31:0] PC,
+input [31:0] exe_inst_PC,
 input [31:0] exe_inst,
 input [1:0] exe_rs1_forward,
 input [1:0] exe_rs2_forward,
@@ -33,8 +33,8 @@ input [31:0] mem_result,
 input freeze_cpu,
 output reg [31:0] exe_result,
 output reg [31:0] mem_addr,
-output reg [31:0] mem_inst
-
+output reg [31:0] mem_inst,
+output logic [31:0] calculated_pc_next
 );
 logic [31:0] mem_addr_next;
 logic [31:0] mem_inst_next;
@@ -47,10 +47,17 @@ wire [31:0] imm_I = {20'b0, inst[31:20]};
 wire [31:0] imm_I_sign_extended = {{20{inst[31]}}, inst[31:20]};
 wire [11:0] imm_S = {inst[31:25], inst[11:7]};
 wire [31:0] imm_S_sign_extended = {{20{inst[31]}}, inst[31:25], inst[11:7]};
+
 wire [12:0] imm_B = {inst[31], inst[7], inst[30:25], inst[11:8], 1'b0};
+wire [31:0] imm_B_sign_extended = {{19{inst[31]}}, inst[7], inst[30:25], inst[11:8], 1'b0};
+wire [31:0] branch_taken_PC = exe_inst_PC + imm_B_sign_extended;
+wire [31:0] branch_not_taken_PC = exe_inst_PC + 4;
+
 wire [31:0] imm_U = {inst[31:12], 12'b0};
 wire [20:0] imm_J = {inst[31], inst[19:12], inst[20], inst[30:21], 1'b0};
-wire [31:0] PC_next = PC+4;
+wire [31:0] imm_J_sign_extended = {{11{imm_J[20]}}, imm_J};
+
+wire [31:0] exe_inst_PC_next = exe_inst_PC+4;
 wire [4:0] shamt = inst[24:20];
 wire right_shift_type = inst[30];
 
@@ -59,7 +66,9 @@ wire [31:0] rs1_data =  exe_rs1_forward == 1 ? exe_result :
 wire [31:0] rs2_data =  exe_rs2_forward == 1 ? exe_result : 
                         exe_rs2_forward == 2 ? mem_result : rd_data2;
 
+wire [31:0] JALR_result = imm_I_sign_extended + rs1_data;
 
+// Dealing with memory address for memory operation in this alwyas_comb block
 always_comb
 begin
     if (freeze_cpu)
@@ -72,25 +81,66 @@ begin
         mem_addr_next = 0;
 end
 
+// Dealing with new PC for jump and branch in this alwyas_comb block
+always_comb
+begin
+	if (freeze_cpu)
+		calculated_pc_next <= exe_inst_PC;
+	else if (opcode == 7'b1100011) begin 
+		if (funct3 == 3'b000) begin // BEQ (Branch Equal) Spec. PDF-Page 22 )
+			calculated_pc_next <= rs1_data == rs2_data ? branch_taken_PC : branch_not_taken_PC;
+		end
+		else if (funct3 == 3'b001) begin // BNE (Branch Not Equal) Spec. PDF-Page 22 )
+			calculated_pc_next <= rs1_data != rs2_data ? branch_taken_PC : branch_not_taken_PC;
+		end
+		else if (funct3 == 3'b100) begin // BLT (Branch Less Than) Spec. PDF-Page 22 )
+			calculated_pc_next <= $signed(rs1_data) < $signed(rs2_data) ? branch_taken_PC : branch_not_taken_PC;
+		end
+		else if (funct3 == 3'b101) begin // BGE (Branch Greater or Equal) Spec. PDF-Page 22 )
+			calculated_pc_next <= $signed(rs1_data) >= $signed(rs2_data) ? branch_taken_PC : branch_not_taken_PC;
+		end
+		else if (funct3 == 3'b110) begin // BLTU (Branch Less Than Unsigned) Spec. PDF-Page 22 )
+			calculated_pc_next <= rs1_data < rs2_data ? branch_taken_PC : branch_not_taken_PC;
+		end
+		else if (funct3 == 3'b111) begin // BGEU (Branch Greater or Equal Unsigned) Spec. PDF-Page 22 )
+			calculated_pc_next <= rs1_data >= rs2_data ? branch_taken_PC : branch_not_taken_PC;
+		end
+		else begin // wrong or unsupported funct3, branch instruction
+			calculated_pc_next <= 0; 
+		end
+		
+	end
+	else if (opcode == 7'b1101111) begin // JAL (Jump And Link) Spec. PDF-Page 39 )
+		calculated_pc_next <= imm_J_sign_extended + exe_inst_PC;
+	end
+	else if (opcode == 7'b1100111) begin // JALR (Jump And Link Register) Spec. PDF-Page 39 )
+		calculated_pc_next <= {JALR_result[31:1], 1'b0};
+	end
+	else begin // not branch or jump instruction
+		calculated_pc_next <= 0;
+	end
+end
+
+// Dealing with Execution result in this alwyas_comb block
 always_comb
 begin
     if (freeze_cpu)
         exe_result_next <= exe_result;
     else if (opcode == 7'b0110111) // LUI (Load Upper Immediate) Spec. PDF-Page 37 )
-	exe_result_next <= imm_U;
+		exe_result_next <= imm_U;
     else if (opcode == 7'b0010111) // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
-        exe_result_next <= imm_U + PC;
+        exe_result_next <= imm_U + exe_inst_PC;
     else if (opcode == 7'b1101111) // JAL (Jump And Link) Spec. PDF-Page 39 )
-        exe_result_next <= PC_next;
+        exe_result_next <= exe_inst_PC_next;
 //	    wr_pc <= {{11{immediate[19]}}, immediate, 1'b0} + PC;
     else if (opcode == 7'b1100111) // JALR (Jump And Link Register) Spec. PDF-Page 39 )
-        exe_result_next <= PC_next;
+        exe_result_next <= exe_inst_PC_next;
 //	    wr_pc <= {{20{immediate[11]}}, immediate[11:1], 1'b0} + rs1_data; // it needs LSB to be zero
 	
     else if (opcode == 7'b0100011) // STORE (Store to Memory) Spec. PDF-Page 42 )
         exe_result_next <= rs2_data;
         
-    if (opcode == 7'b0010011) // OP_IMM (Integer Register-Immediate Instructions) Spec. PDF-Page 36 )
+    else if (opcode == 7'b0010011) // OP_IMM (Integer Register-Immediate Instructions) Spec. PDF-Page 36 )
     begin
         if (funct3 == 3'b000) // ADDI (Add Immediate)
 	       exe_result_next = rs1_data + imm_I_sign_extended;

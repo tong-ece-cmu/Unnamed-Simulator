@@ -85,7 +85,7 @@ initial begin
         else $display("RAW HANDLING RS2 Failed");
     end
     else if($test$plusargs("TEST_BRANCH_STALL_01")) begin
-        assert(registers[2] == 32'h03) $display("BRANCH STALL 01 Passed");
+        assert(registers[1] == 32'h03) $display("BRANCH STALL 01 Passed");
         else $display("BRANCH STALL 01 Failed");
     end
     else if($test$plusargs("TEST_BRANCH_STALL_TAKEN")) begin

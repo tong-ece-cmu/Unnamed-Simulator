@@ -48,7 +48,7 @@ input rst
     wire [31:0] dram_addr_wr;
     wire [7:0] dram_write_data;
     
-    wire[31:0] inst, PC;
+    wire[31:0] inst, PC, exe_inst_PC, calculated_pc_next;
     
     InstructionMemory instruction_memory_module(.*);
     RegisterFile register_module(.*);
@@ -114,7 +114,9 @@ input rst,
 input [31:0] inst,
 input freeze_cpu,
 input [31:0] mem_inst,
+input logic [31:0] calculated_pc_next,
 output reg [31:0] PC,
+output reg [31:0] exe_inst_PC, // just one cycle delayed, for branch
 output rd1,
 output rd2,
 output [4:0] addr1,
@@ -130,10 +132,14 @@ logic[31:0] exe_inst_next;
 
 wire exe_is_load = (exe_inst[6:0] ==   7'b0000011);  // LOAD (Load to Register) Spec. PDF-Page 42 )
 
+wire is_jump_inst =(inst[6:0] ==  7'b1101111)   // JAL (Jump And Link) Spec. PDF-Page 39 )
+                || (inst[6:0] ==  7'b1100111)   // JALR (Jump And Link Register) Spec. PDF-Page 39 )
+                ;
+
 wire need_rs1 =     //                  7'b0110111 // LUI (Load Upper Immediate) Spec. PDF-Page 37 
                     //                  7'b0010111 // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
                     //                  7'b1101111 // JAL (Jump And Link) Spec. PDF-Page 39 )
-                    (inst[6:0] ==  7'b1100111)  // JALR (Jump And Link Register) Spec. PDF-Page 39 
+                    (inst[6:0] ==  7'b1100111)  // JALR (Jump And Link Register) Spec. PDF-Page 39 )
                 ||  (inst[6:0] ==  7'b1100011)  // BRANCH (Comparasion and Branch) Spec. PDF-Page 40 )
                 ||  (inst[6:0] ==  7'b0000011)  // LOAD (Load to Register) Spec. PDF-Page 42 )
                 ||  (inst[6:0] ==  7'b0100011)  // STORE (Store to Memory) Spec. PDF-Page 42 )
@@ -204,15 +210,27 @@ always_comb begin
     else if (freeze_cpu) begin
         counter_next = counter;
     end
-    else if (counter == 0) begin
+    else if (counter == 0) begin 
         if ((is_rs1_one_step_raw || is_rs2_one_step_raw) && exe_is_load) begin
             counter_next = 1;
+        end
+        else if (is_jump_inst) begin
+            counter_next = 2;
         end
         else begin
             counter_next = 0;
         end
     end
     else if (counter == 1) begin
+        // returning to idle for read after load
+        counter_next = 0;
+    end
+    else if (counter == 2) begin
+        // setting pc using result from execution unit
+        counter_next = 3;
+    end
+    else if (counter == 3) begin
+        // returning to idle for jump NOP
         counter_next = 0;
     end
     else begin
@@ -249,21 +267,26 @@ end
 
 
 always_comb begin
-    if (rst)                PC_next = 0;
-    else if (freeze_cpu)    PC_next = PC;
+    if (rst)                    PC_next = 0;
+    else if (freeze_cpu)        PC_next = PC;
     else if (counter_next == 1) PC_next = PC; // NOP for read after load
-    else                    PC_next = PC + 4;
+    else if (counter_next == 2) PC_next = PC; // NOP for jump instruction resolving
+    else if (counter_next == 3) PC_next = calculated_pc_next; // jump instruction resolved
+    else                        PC_next = PC + 4;
 end
 
 always_comb begin
-    if (rst)        exe_inst_next = 32'h00000013;
-    else if (freeze_cpu) exe_inst_next = exe_inst;
+    if (rst)                    exe_inst_next = 32'h00000013;
+    else if (freeze_cpu)        exe_inst_next = exe_inst;
     else if (counter_next == 1) exe_inst_next = 32'h00000013; // NOP for read after load
-    else            exe_inst_next = inst;
+    else if (counter_next == 2) exe_inst_next = inst; // pass the jump instruction to resolve
+    else if (counter_next == 3) exe_inst_next = 32'h00000013; // NOP for jump instruction resolving
+    else                        exe_inst_next = inst;
 end
 
 always_ff @(posedge clk) begin
     PC <= PC_next;
+    exe_inst_PC <= PC;
     exe_inst <= exe_inst_next;
     exe_rs1_forward <= rs1_forward_next;
     exe_rs2_forward <= rs2_forward_next;
