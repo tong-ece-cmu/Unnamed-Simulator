@@ -89,7 +89,7 @@ initial begin
         else $display("BRANCH STALL 01 Failed");
     end
     else if($test$plusargs("TEST_BRANCH_STALL_TAKEN")) begin
-        assert(registers[2] == 32'h06) $display("BRANCH STALL TAKEN Passed");
+        assert(registers[1] == 32'h06) $display("BRANCH STALL TAKEN Passed");
         else $display("BRANCH STALL TAKEN Failed");
     end
     else

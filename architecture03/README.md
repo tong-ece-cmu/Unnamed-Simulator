@@ -212,6 +212,13 @@ end
 
 ```
 
+# Dual Core
+
+We need Dual Core. This is kind exciting. So each core will execute one thread. We need two threads of instruction flow. That's compiler's job, we can not going to do anything here. The two cores has shared memory space and they share data through cache. We currently have one level of cache. Our cache code is pretty complicated. It's checking on the memory instruction and if there is a store or load instruction, it will kick start the memory operation state machine. How do we insert a MOSI cache coherency controller in there. We may also need an arbitor to handle situation when the two cores tries to access the cache at the same time. 
+
+First, we will have to instruction feed to the shared cache module. We need to check both memory instruction to determine whether it's a memory operation. Assuming we can only fetch one block at a time. Both Cores will be on freeze. We will process the first core's request first. The state machine go on and doing its business. After finishing the first core, unfreeze it, then serve the second core. 
+
+
 # Instruction Fetch stage
 
 Maybe we should add a instruction fetch stage. It will fetch instruction from memory, just like the data memory stage. The program will reside near the top of the address space while heap is near the bottom of the address space. By top, I mean the address number is bigger. And they can even share the same cache.

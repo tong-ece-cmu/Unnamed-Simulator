@@ -136,6 +136,8 @@ wire is_jump_inst =(inst[6:0] ==  7'b1101111)   // JAL (Jump And Link) Spec. PDF
                 || (inst[6:0] ==  7'b1100111)   // JALR (Jump And Link Register) Spec. PDF-Page 39 )
                 ;
 
+wire is_branch_inst = (inst[6:0] ==  7'b1100011);  // BRANCH (Comparasion and Branch) Spec. PDF-Page 40 )
+
 wire need_rs1 =     //                  7'b0110111 // LUI (Load Upper Immediate) Spec. PDF-Page 37 
                     //                  7'b0010111 // AUIPC (Add Upper Immediate to PC) Spec. PDF-Page 37 )
                     //                  7'b1101111 // JAL (Jump And Link) Spec. PDF-Page 39 )
@@ -199,6 +201,51 @@ wire is_rs2_two_step_raw = need_rs2_n0 && next_next_inst_need_rd && (addr2_inst 
 reg [7:0] counter;
 logic [7:0] counter_next;
 
+
+reg [1:0] branchPredictorState;
+wire predictTaken = branchPredictorState == 3 || branchPredictorState == 2;
+wire [31:0] imm_B_sign_extended = {{19{inst[31]}}, inst[7], inst[30:25], inst[11:8], 1'b0};
+wire [31:0] predictedPC = is_branch_inst == 1 ? (predictTaken == 1 ? PC + imm_B_sign_extended : PC + 4) : 0;
+
+wire WrongPrediction = counter == 4 && PC != calculated_pc_next;
+wire CorrectPrediction = counter == 4 && PC == calculated_pc_next;
+
+always_ff @( posedge clk ) begin
+    if (rst)                    branchPredictorState <= 0;
+    else if (freeze_cpu)        branchPredictorState <= branchPredictorState;
+    else if (WrongPrediction) begin
+        if (branchPredictorState == 0)begin
+            branchPredictorState <= 1;
+        end
+        else if (branchPredictorState == 1)begin
+            branchPredictorState <= 3;
+        end
+        else if (branchPredictorState == 2)begin
+            branchPredictorState <= 0;
+        end
+        else if (branchPredictorState == 3)begin
+            branchPredictorState <= 2;
+        end
+    end
+    else if (CorrectPrediction) begin
+        if (branchPredictorState == 0)begin
+            branchPredictorState <= 0;
+        end
+        else if (branchPredictorState == 1)begin
+            branchPredictorState <= 0;
+        end
+        else if (branchPredictorState == 2)begin
+            branchPredictorState <= 3;
+        end
+        else if (branchPredictorState == 3)begin
+            branchPredictorState <= 3;
+        end
+    end
+    else begin
+        branchPredictorState <= branchPredictorState;
+    end
+end
+
 assign rd1 = counter_next == 1 || (!freeze_cpu && need_rs1);
 assign rd2 = !freeze_cpu && need_rs2;
 
@@ -217,6 +264,10 @@ always_comb begin
         else if (is_jump_inst) begin
             counter_next = 2;
         end
+        else if (is_branch_inst) begin
+            // we will load the predicted branch in the next clock edge
+            counter_next = 4;
+        end
         else begin
             counter_next = 0;
         end
@@ -233,6 +284,10 @@ always_comb begin
         // returning to idle for jump NOP
         counter_next = 0;
     end
+    else if (counter == 4) begin
+        // branch predicted, comparing the calculated PC and predicted PC
+        counter_next = 0;
+    end
     else begin
         counter_next = 0;
     end
@@ -242,6 +297,8 @@ end
 always_comb begin
     if (freeze_cpu)
         rs1_forward_next = exe_rs1_forward;
+    else if (WrongPrediction)
+        rs1_forward_next = 0;
     else if (counter_next == 1)
         rs1_forward_next = 0; // forward for NOP is none
     else if (is_rs1_one_step_raw)
@@ -255,6 +312,8 @@ end
 always_comb begin
     if (freeze_cpu)
         rs2_forward_next = exe_rs2_forward;
+    else if (WrongPrediction)
+        rs2_forward_next = 0;
     else if (counter_next == 1)
         rs2_forward_next = 0; // forward for NOP is none
     else if (is_rs2_one_step_raw)
@@ -272,6 +331,8 @@ always_comb begin
     else if (counter_next == 1) PC_next = PC; // NOP for read after load
     else if (counter_next == 2) PC_next = PC; // NOP for jump instruction resolving
     else if (counter_next == 3) PC_next = calculated_pc_next; // jump instruction resolved
+    else if (counter_next == 4) PC_next = predictedPC; // jump instruction resolved
+    else if (WrongPrediction) PC_next = calculated_pc_next; // branch instruction resolved
     else                        PC_next = PC + 4;
 end
 
@@ -281,6 +342,7 @@ always_comb begin
     else if (counter_next == 1) exe_inst_next = 32'h00000013; // NOP for read after load
     else if (counter_next == 2) exe_inst_next = inst; // pass the jump instruction to resolve
     else if (counter_next == 3) exe_inst_next = 32'h00000013; // NOP for jump instruction resolving
+    else if (WrongPrediction) exe_inst_next = 32'h00000013; // branch instruction resolved
     else                        exe_inst_next = inst;
 end
 

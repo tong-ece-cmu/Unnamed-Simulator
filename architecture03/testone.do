@@ -2,7 +2,7 @@
 #TEST_INST1
 #TEST_BRANCH_STALL_01
 project compileall
-vsim work.main_tb +TEST_BRANCH_STALL_01=1
+vsim work.main_tb +TEST_BRANCH_STALL_TAKEN=1
 restart -force
 run -all
 

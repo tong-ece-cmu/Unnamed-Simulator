@@ -13,7 +13,7 @@ Here stores different CPU designs and their design notes; Experiments with diffe
 - [Completed] 4KiB Direct-Mapped Cache - 32 bytes Block Size
 - [Completed] Data Forwarding Special Case - Read after Load
 - [Paused] Create Tcl(do) Script for Test Automation
-- [TODO] Branching + Predictor
+- [Completed] Branching + Predictor
 - [TODO] More Assembly Programs for Testing
 - [TODO] Dual Core
 

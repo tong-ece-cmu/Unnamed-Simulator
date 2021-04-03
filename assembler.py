@@ -83,6 +83,15 @@ NOP'''},
 "code":'''NOP
 ADDI x2, x0, 32
 ADDI x2, x2, 32'''},
+
+{"name":"BranchStallTaken", 
+"code":'''ADDI x1, x0, 1
+BEQ x1, x1, 12
+ADDI x1, x1, 2
+JAL x0, 8
+ADDI x1, x1, 4
+ADDI x1, x1, 1
+NOP'''},
 ]
 
 p2 = '''ADDI x1, x0, 3
@@ -104,7 +113,7 @@ XORI X1, x1, 2
 # f = open('..\\HighLevelLanguageTests\\branch.assembly', "r")
 # f = open('HighLevelLanguageTests\\branch.assembly', "r")
 # asem = f.read()
-program = library[1]
+program = library[2]
 mem_dir = "HighLevelLanguageTests"
 asem = program["code"]
 print("Assembling "+program["name"])
