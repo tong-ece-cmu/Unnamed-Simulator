@@ -218,6 +218,37 @@ We need Dual Core. This is kind exciting. So each core will execute one thread. 
 
 First, we will have to instruction feed to the shared cache module. We need to check both memory instruction to determine whether it's a memory operation. Assuming we can only fetch one block at a time. Both Cores will be on freeze. We will process the first core's request first. The state machine go on and doing its business. After finishing the first core, unfreeze it, then serve the second core. 
 
+Can we just stack two cores together? As simple as that? Well, let's examining them one by one.
+
+## InstructionMemory instruction_memory_module(.*);
+
+This module is used to feed instruction to the decoder. It needs PC and clk, and give instructions. For dual core, things are complicated. We want to model the thread fork, join scheme. So all cores processing the same instructions until some special instruction that tells the second core to do something else. Should we do that? That seems wasteful. All cores doing things that could have been done by the single core. How about we just have totally separate instruction fetch. It will have different PC and instructions. The compiler needs to create separate instructions for different cores. If we have a jump instruction that's core specific. Then the two cores can share the instruction memory. This jump will be the diverge point for the two cores. For them to join, they can wait for other core to write specific values or something else. We really don't want the two cores to do redundant task. 
+
+## RegisterFile register_module(.*);
+
+Nothing special here. Two cores will have completely separated register file, one for each core. 
+
+## InstructionDecode instruction_decode_module(.*);
+
+This module's primary duty is to give proper instructions and operands to the execution stage. This module just wants the instruction. Each core can have one and they won't interfere each other.
+
+## Execute execute_module(.*);
+
+It needs to ignore the core specific jump instruction. Other than that, everything should be fine.
+
+## Cache cache_module(.*);
+
+This thing is complicated. We will have shared Level 2 cache and DRAM. Currently, we only have 1 level of cache and a DRAM. Freeze CPU needs to happen. We are signaling the shared L2 cache. The two private caches will send request to L2 cache via address, mem op, wires. The shared cache will signal one cache that its request processing and signal the other to wait. Then it will check the tag and determine hit or miss. If miss, go fetch from DRAM. There two steps, checking the tag to determine hit or miss. Then fetch from DRAM. The first steps should be available for both core, so they can do it at the same time. But fetching from DRAM should have a queue that can only happens in sequence. 
+
+## Write_Back_Control write_back_control_module(.*);
+
+Create separate copies of this module for each core.
+
+
+## DRAM dram_module(.*);
+
+There will be one DRAM module. It will handling request from shared L2 cache. Not much should change here. 
+
 
 # Instruction Fetch stage
 
