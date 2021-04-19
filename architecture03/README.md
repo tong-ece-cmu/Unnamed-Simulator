@@ -214,7 +214,7 @@ end
 
 # Dual Core
 
-We need Dual Core. This is kind exciting. So each core will execute one thread. We need two threads of instruction flow. That's compiler's job, we can not going to do anything here. The two cores has shared memory space and they share data through cache. We currently have one level of cache. Our cache code is pretty complicated. It's checking on the memory instruction and if there is a store or load instruction, it will kick start the memory operation state machine. How do we insert a MOSI cache coherency controller in there. We may also need an arbitor to handle situation when the two cores tries to access the cache at the same time. 
+We need Dual Core. This is kind exciting. So each core will execute one thread. We need two threads of instruction flow. That's compiler's job, we are not going to do anything here. The two cores has shared memory space and they share data through cache. We currently have one level of cache. Our cache code is pretty complicated. It's checking on the memory instruction and if there is a store or load instruction, it will kick start the memory operation state machine. How do we insert a MOSI cache coherency controller in there? We may also need an arbitor to handle situation when the two cores tries to access the cache at the same time. 
 
 First, we will have to instruction feed to the shared cache module. We need to check both memory instruction to determine whether it's a memory operation. Assuming we can only fetch one block at a time. Both Cores will be on freeze. We will process the first core's request first. The state machine go on and doing its business. After finishing the first core, unfreeze it, then serve the second core. 
 
@@ -223,6 +223,8 @@ Can we just stack two cores together? As simple as that? Well, let's examining t
 ## InstructionMemory instruction_memory_module(.*);
 
 This module is used to feed instruction to the decoder. It needs PC and clk, and give instructions. For dual core, things are complicated. We want to model the thread fork, join scheme. So all cores processing the same instructions until some special instruction that tells the second core to do something else. Should we do that? That seems wasteful. All cores doing things that could have been done by the single core. How about we just have totally separate instruction fetch. It will have different PC and instructions. The compiler needs to create separate instructions for different cores. If we have a jump instruction that's core specific. Then the two cores can share the instruction memory. This jump will be the diverge point for the two cores. For them to join, they can wait for other core to write specific values or something else. We really don't want the two cores to do redundant task. 
+
+For our purpose, we can just instatiate two instruction memory module. So two completely seperate instruction streams. We can make the content of the stream to be the same. So we don't need to change the ISA for the two cores to operate on its own. Each core will do their own thing, those things can be completely different, or be totally the same. 
 
 ## RegisterFile register_module(.*);
 
@@ -234,7 +236,7 @@ This module's primary duty is to give proper instructions and operands to the ex
 
 ## Execute execute_module(.*);
 
-It needs to ignore the core specific jump instruction. Other than that, everything should be fine.
+It needs to ignore the core specific jump instruction. Other than that, everything should be fine. But if we are using two seperate instruction memory module, then no change is needed here.
 
 ## Cache cache_module(.*);
 
@@ -249,6 +251,47 @@ Create separate copies of this module for each core.
 
 There will be one DRAM module. It will handling request from shared L2 cache. Not much should change here. 
 
+
+
+## Dual Core implementation Roadmap
+
+So how are we going to do it? We are pretty much settled on some facts. Cache module is again the star of the show. All other module can just be copy and paste. So, cache. 
+
+The data structure in cache is fairly straight forward. Piece of sram for data. Piece of sram for tag. A big register for valid bit. For incoming address, we need to split it into block index and tag. Cache hit if at this index the tag matches with the valid block. If cache not hit, the insteresting things begin.
+
+Keeping track of a counter that count how many cycle for DRAM access is not feasible for new design. It's the old cache design. It's going to be very unreliable. The new design should rely on handshake signals. Ready, valid, data, clk. So there will be two channels for bi-directional communication between cache and DRAM. Valid, data, clk for transmitting side and Ready, data, clk for receiving side. 
+
+Let's first think about the simple case where one cache is communicating with DRAM. 
+
+At rising edge, Cache will put valid high and present the data.
+
+At the second rising edge, cache will check the ready signal, if it's high, switch the data to next one. If no more data, valid signal will be low.
+
+From DRAM perspective,
+
+At rising edge, if it's ready, put the ready up.
+
+At the second rising edge, if cache data is valid, sample in the data. If still ready, put ready up. Else put ready down.
+
+For DRAM, we are modeling the latency there. So it will initally wait for 4 cycle, then continuously output 32 byte, one block. 
+
+At rising edge, put ready high.
+
+At next rising edge, if valid, for period after it, record the data, put ready low. State machine going from idle to latency state. 
+
+... some cycles later
+
+Start output data to cache.
+
+At rising edge, put valid high and present data. 
+
+Next rising edge, if ready held still before, present next data.
+
+... some cycles later
+
+Put valid low. state machine go to idle. Put receiver side ready high.
+
+Maybe we need a fourth architecture.
 
 # Instruction Fetch stage
 
