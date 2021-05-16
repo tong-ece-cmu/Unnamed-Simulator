@@ -293,6 +293,23 @@ Put valid low. state machine go to idle. Put receiver side ready high.
 
 Maybe we need a fourth architecture.
 
+## Implementation notes
+
+We have a problem. There is just too much signals to keep track of, for communicating between DRAM and cache. There is a channel that's for cache to send message to dram. And there is another channel for dram to send message to cache. That's 6 wires already. Then we have clk, rst, address, freeze CPU. It's just a lot to handle in one shot. 
+
+We need to break the design into sub-modules. There is a CPU facing side. And there is DRAM facing side. How do we separate those two sides of the cache? CPU facing side, it will just check the tag, valid bit, and tag bits. If it can service it, do it. If not, just hang and let other module to handle it. So it needs to handle freeze CPU, clk, rst, mem_inst, mem_addr, exe_result(passing it to write back). 
+
+The DRAM facing side will take control of the data cache and communication from DRAM. The most bare bone design will be just a register array, with no state machine involved. After getting the signal from cache about accessing DRAM. It will copy the requested block from DRAM register array into cache data. 
+
+The proposed communication scheme between DRAM facing side and CPU facing side will be simple. From CPU side to DRAM side, valid, read/write, block address. From DRAM side to CPU side, Done. DRAM side should have unrestricted access to cache structure. 
+
+So DRAM side cache only cares about whether this block is valid or not. If valid, write it back first. Then just load the content from DRAM. Then notify the CPU side cache that everything is done. Then CPU side cache can take over and service the request.
+
+So, the DRAM side cache will issue a request to the cache data array. And write the data from DRAM to cache. The state machine will be simple, go to busy state, pull high all the signals required to write to cache, and ready the data. Then increment the address to put the next byte of data. After done, raise the done signal.
+
+An added benefit of this 3 component cache module is we can easily duplicate the CPU sides to support duo core. 
+
+
 # Instruction Fetch stage
 
 Maybe we should add a instruction fetch stage. It will fetch instruction from memory, just like the data memory stage. The program will reside near the top of the address space while heap is near the bottom of the address space. By top, I mean the address number is bigger. And they can even share the same cache.

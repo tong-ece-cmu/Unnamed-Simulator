@@ -30,8 +30,8 @@ LH      unimplemented
 LW      rd, rs1, imm     - dest, base address, offset
 LBU     unimplemented
 LHU     unimplemented
-SB      unimplemented
-SH      unimplemented
+SB      rs1, rs2, imm   - base address, src, offset
+SH      rs1, rs2, imm   - base address, src, offset
 SW      rs1, rs2, imm   - base address, src, offset
 ADDI    rd, rs1, imm    - dest, src, immediate
 SLTI    rd, rs1, imm    - dest, src, immediate - untested
@@ -92,6 +92,14 @@ JAL x0, 8
 ADDI x1, x1, 4
 ADDI x1, x1, 1
 NOP'''},
+
+{"name":"LoadStore", 
+"code":'''NOP
+ADDI x2, x0, 32
+NOP
+SB x0, x2, 0
+LB x2, x0, 0
+ADDI x2, x2, 32'''},
 ]
 
 p2 = '''ADDI x1, x0, 3
@@ -113,7 +121,7 @@ XORI X1, x1, 2
 # f = open('..\\HighLevelLanguageTests\\branch.assembly', "r")
 # f = open('HighLevelLanguageTests\\branch.assembly', "r")
 # asem = f.read()
-program = library[2]
+program = library[3]
 mem_dir = "HighLevelLanguageTests"
 asem = program["code"]
 print("Assembling "+program["name"])
@@ -140,16 +148,43 @@ def getOperands(tokens):
 
 def getMachineCode(token, oprd):
     mc = 0x00000013 # NOP
-    if (token[0].lower() == 'lw'):
+    if (token[0].lower() == 'lb' or token[0].lower() == 'lh' or
+        token[0].lower() == 'lw' or token[0].lower() == 'lbu' or
+        token[0].lower() == 'lhu'):
         opcode = 0x03
-        funct3 = 0x2
+        if (token[0].lower() == 'lb'):
+            funct3 = 0x0
+        elif (token[0].lower() == 'lh'):
+            funct3 = 0x1
+        elif (token[0].lower() == 'lw'):
+            funct3 = 0x2
+        elif (token[0].lower() == 'lbu'):
+            funct3 = 0x4
+        elif (token[0].lower() == 'lhu'):
+            funct3 = 0x5
+        else:
+            print('xxxxxxxxxxxxxxxxxx BAD SYNTAX Below xxxxxxxxxxxxxxxxxx')
+            print('unsupported load instruction '+str(token[0]))
+            print('xxxxxxxxxxxxxxxxxx BAD SYNTAX Above xxxxxxxxxxxxxxxxxx')
+            exit(1)
         rd = oprd[0]
         rs1 = oprd[1]
         imm = oprd[2]
         mc = imm << 20 | rs1 << 15 | funct3 << 12 | rd << 7 | opcode
-    elif (token[0].lower() == 'sw'):
+    elif (token[0].lower() == 'sb' or token[0].lower() == 'sh' or
+          token[0].lower() == 'sw'):
         opcode = 0x23
-        funct3 = 0x2
+        if (token[0].lower() == 'sb'):
+            funct3 = 0x0
+        elif (token[0].lower() == 'sh'):
+            funct3 = 0x1
+        elif (token[0].lower() == 'sw'):
+            funct3 = 0x2
+        else:
+            print('xxxxxxxxxxxxxxxxxx BAD SYNTAX Below xxxxxxxxxxxxxxxxxx')
+            print('unsupported store instruction '+str(token[0]))
+            print('xxxxxxxxxxxxxxxxxx BAD SYNTAX Above xxxxxxxxxxxxxxxxxx')
+            exit(1)
         rs1 = oprd[0]
         rs2 = oprd[1]
         imm4_0 = oprd[2] & 0x1F
@@ -304,7 +339,7 @@ def generateBinaryCode(asem, f=None):
             print("Invalid Output Option")
 
 
-NoFile = False
+NoFile = True
 
 if NoFile:
     generateBinaryCode(asem)
@@ -323,6 +358,8 @@ else:
 
 
 
+#00 20 00 23
+# 0000 000 0 0010  0000 0 000  0000 0 010 0011
 
-
-
+#00 00 01 03
+#0000 0000 0000 0000 0000  0001 0 000 0011

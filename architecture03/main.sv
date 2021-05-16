@@ -48,6 +48,20 @@ input rst
     wire [31:0] dram_addr_wr;
     wire [7:0] dram_write_data;
     
+
+    wire dram_is_rd;// = dram_signal == 1;
+    wire [31:0] dram_op_address;// dram_addr_wr;
+
+    wire dram_rdy;
+    wire cache_vld;// = dram_signal != 0;
+    wire [7:0] dram_store;
+
+    wire cache_rdy;
+    wire dram_vld;
+    wire [7:0] dram_load;
+
+
+
     wire[31:0] inst, PC, exe_inst_PC, calculated_pc_next;
     
     InstructionMemory instruction_memory_module(.*);
