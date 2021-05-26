@@ -309,6 +309,13 @@ So, the DRAM side cache will issue a request to the cache data array. And write 
 
 An added benefit of this 3 component cache module is we can easily duplicate the CPU sides to support duo core. 
 
+Actually, there are three data/memory like structure in cache, tag storage, data storage, and valid bit storage. They will be implemented as Multi-port SRAM. So the CPU facing cache will be a control unit that deal with reading and writing of those SRAM and presenting those data to the CPU. The DRAM facing cache will receive signal from CPU facing cache and load/store with DRAM. 
+
+So, cache hit and present result to CPU should hopefully be in one clock cycle. 
+
+Also, cache miss and freeze CPU signal should also be in one clock cycle. Freeze CPU should also be the signal that tells the DRAM facing cache to read or write DRAM. 
+
+Status Update here, I separated the data structure of the cache into a registerfile-like structure. Now, the CPU facing cache acts like a controller that talks with the cache data module. The next step will be adding another interface to cache data for DRAM facing cache to use. It will probably involve a FIFO to compensate the difference in bandwidth. CPU needs 32 bit and DRAM uses 8 bit.
 
 # Instruction Fetch stage
 

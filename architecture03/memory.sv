@@ -19,13 +19,6 @@
 // 
 //////////////////////////////////////////////////////////////////////////////////
 
-// module cache_resource (
-//     ports
-// );
-    
-
-// endmodule
-
 
 
 module cache_cpu_side #(
@@ -41,14 +34,14 @@ module cache_cpu_side #(
     output reg [31:0] write_back_inst,
     output logic freeze_cpu,
 
-    output [6:0] cache_index,
-    input valid_bit,
-    input [19:0] tag_bits,
-
-    output is_rd,
-    output is_wr,
-    output [11:0] addr,
-    output [31:0] wr_data,
+    // output [6:0] cache_index,
+    // input valid_bit,
+    // input [19:0] tag_bits,
+    input cache_hit,
+    output logic is_rd,
+    output logic is_wr,
+    // output [11:0] addr,
+    // output [31:0] wr_data,
     input [31:0] rd_data,
 
 
@@ -84,23 +77,27 @@ wire [4:0] offset_field = mem_addr[4:0];
 wire is_store = mem_inst[6:0] == 7'b0100011; // STORE (Store to Memory) Spec. PDF-Page 42 )
 wire is_load = mem_inst[6:0] == 7'b0000011; // LOAD (Load from Memory) Spec. PDF-Page 42 )
 
-assign is_rd = is_load;
-assign is_wr = is_store;
-assign addr = {index_field, offset_field};
-assign wr_data = exe_result;
+// assign is_rd = is_load;
+// assign is_wr = is_store;
+// assign addr = {index_field, offset_field};
+// assign wr_data = exe_result;
 
-assign cache_index = index_field;
+// assign cache_index = index_field;
 // assign is_load_store = is_store || is_load;
-wire cache_hit = valid_bit && tag_bits == tag_field;
+// wire cache_hit = valid_bit && tag_bits == tag_field;
 
 reg [7:0] state;
 
 always_comb begin : DoneInOneClockCycleHandler
     if ((is_load || is_store) && !cache_hit) begin
         freeze_cpu = 1;
+        is_rd = 0;
+        is_wr = 0;
     end
     else begin
         freeze_cpu = 0;
+        is_rd = is_load;
+        is_wr = is_store;
     end
 end
 
@@ -219,7 +216,66 @@ module cache_dram_side #(
 endmodule : cache_dram_side
 
 
+module cache_data (
+    input clk,
+    input rst,
 
+    input rd1,
+    input [11:0] addr1,
+    output logic [31:0] rd_data1,
+    output logic [19:0] tag1,
+    output logic valid1,
+
+    input wr1,
+    input [31:0] wr_data1,
+    input [19:0] wr_tag1
+
+);
+
+    // 4KiB cache, 4 bytes a word
+    // 4KiB cache, 4 bytes a word, 1024 word
+    reg [31:0] data [1024:0];
+    logic [31:0] data_next_wr1;
+    // 4KiB cache, 32 bytes block size, each block 8 words
+    // 32 bytes block size, each block 32 bytes
+    // 4KiB cache, 128 blocks
+    // 32 bit address, 5 bit block offset, 7 bit cache index, 20 bit tag
+    reg [19:0] tags [127:0];
+    logic [19:0] tags_next_wr1;
+
+    reg [127:0] valid;
+    logic valid_next_wr1;
+
+    always_comb begin : readCacheData
+        rd_data1 = rd1 ? data[addr1[11:2]] : 0;
+        tag1 = (rd1 || wr1) ? tags[addr1[11:5]] : 0;
+        valid1 = (rd1 || wr1) ? valid[addr1[11:5]] : 0;
+
+        if (wr1) begin
+            data_next_wr1 = wr_data1;
+            tags_next_wr1 = wr_tag1;
+            valid_next_wr1 = 1;
+        end
+        else begin
+            data_next_wr1 = 0;
+            tags_next_wr1 = 0;
+            valid_next_wr1 = 0;
+        end
+    end
+
+    always_ff @( posedge clk ) begin : wrtieCacheData
+        if (rst) begin
+            valid <= 0;
+        end
+        else if (wr1) begin
+            data[addr1[11:2]] <= data_next_wr1;
+            tags[addr1[11:5]] <= tags_next_wr1;
+            valid[addr1[11:5]] <= valid_next_wr1;
+        end
+    end
+
+
+endmodule : cache_data
 
 module Cache #(
 parameter DATA_WIDTH = 8,
@@ -261,17 +317,17 @@ output logic freeze_cpu
 
 // 4KiB cache, 4 bytes a word
 // 4KiB cache, 4 bytes a word, 1024 word
-reg [DATA_WIDTH-1:0] data [4095:0];
+// reg [DATA_WIDTH-1:0] data [4095:0];
 
 // 4KiB cache, 32 bytes block size, each block 8 words
 // 32 bytes block size, each block 32 bytes
 // 4KiB cache, 128 blocks
 // 32 bit address, 5 bit block offset, 7 bit cache index, 20 bit tag
-reg [19:0] tags [127:0];
-logic [19:0] tags_next;
-reg [127:0] valid;
-logic valid_next;
-wire is_load_store;
+// reg [19:0] tags [127:0];
+// logic [19:0] tags_next;
+// reg [127:0] valid;
+// logic valid_next;
+// wire is_load_store;
 wire [6:0] index_field = mem_addr[11:5];
 wire [19:0] tag_field = mem_addr[31:12];
 wire [4:0] offset_field = mem_addr[4:0];
@@ -289,62 +345,80 @@ logic [DATA_WIDTH-1:0] cache_data_write_next;
 //wire [4:0] cache_counter_offset = cache_counter_next - 2;
 // reg [4:0] block_addr_counter;
 // logic [4:0] block_addr_counter_next;
-logic [11:0] cache_data_addr;
+// logic [11:0] cache_data_addr;
 
-wire is_store = mem_inst[6:0] == 7'b0100011; // STORE (Store to Memory) Spec. PDF-Page 42 )
-wire is_load = mem_inst[6:0] == 7'b0000011; // LOAD (Load from Memory) Spec. PDF-Page 42 )
+// wire is_store = mem_inst[6:0] == 7'b0100011; // STORE (Store to Memory) Spec. PDF-Page 42 )
+// wire is_load = mem_inst[6:0] == 7'b0000011; // LOAD (Load from Memory) Spec. PDF-Page 42 )
 
-assign is_load_store = is_store || is_load;
-wire cache_hit = valid[index_field] && tags[index_field] == tag_field;
+
 
 wire __valid, __is_rd, __done;
 wire [31:0] __addr;
 
-wire [6:0] cache_index;
-wire valid_bit;
-wire [19:0] tag_bits;
+// wire [6:0] cache_index;
+// wire valid_bit;
+// wire [19:0] tag_bits;
 
 wire is_rd, is_wr;
-wire [11:0] addr;
-wire [31:0] wr_data;
-logic [31:0] rd_data;
+// wire [11:0] addr;
+// wire [31:0] wr_data;
+wire [31:0] rd_data;
 
+// cache data wires
 
-assign valid_bit = valid[cache_index];
-assign tag_bits = tags[cache_index];
+wire rd1 = is_rd;
+wire [11:0] addr1 = { index_field, offset_field };
+wire [31:0] rd_data1;
+wire [19:0] tag1;
+wire valid1;
+
+wire wr1 = is_wr;
+// wire [11:0] addr_w1 = { index_field, offset_field };
+wire [31:0] wr_data1 = exe_result;
+wire [19:0] wr_tag1 = tag_field;
+// wire wr_valid1 = 1;
+
+assign rd_data = rd_data1;
+// assign is_load_store = is_store || is_load;
+wire cache_hit = valid1 && tag1 == tag_field;
+
+// assign valid_bit = valid[cache_index];
+// assign tag_bits = tags[cache_index];
 
 cache_cpu_side cacheCPUSide (.*);
 
-cache_dram_side cacheDRAMSide (.*);
+// cache_dram_side cacheDRAMSide (.*);
 
-always_comb begin : cacheDataRead
-    rd_data = 0;
-    if (is_rd) begin
-        rd_data = { data[addr+3],
-                    data[addr+2],
-                    data[addr+1],
-                    data[addr+0] };
-    end
+cache_data cacheData(.*);
+
+// always_comb begin : cacheDataRead
+//     rd_data = 0;
+//     if (is_rd) begin
+//         rd_data = { data[addr+3],
+//                     data[addr+2],
+//                     data[addr+1],
+//                     data[addr+0] };
+//     end
     
-end
+// end
 
-always_ff @( posedge clk ) begin : resetValid
-    if (rst) begin
-        valid <= 0;
-    end
+// always_ff @( posedge clk ) begin : resetValid
+//     if (rst) begin
+//         valid <= 0;
+//     end
 
-    if (__valid) begin
-        valid[cache_index] <= 1;
-        tags[cache_index] <= tag_field;
-    end
+//     if (__valid) begin
+//         valid[cache_index] <= 1;
+//         tags[cache_index] <= tag_field;
+//     end
 
-    if (is_wr) begin
-        data[addr+3] <= wr_data[31:24];
-        data[addr+2] <= wr_data[23:16];
-        data[addr+1] <= wr_data[15:8];
-        data[addr+0] <= wr_data[7:0];
-    end
-end
+//     if (is_wr) begin
+//         data[addr+3] <= wr_data[31:24];
+//         data[addr+2] <= wr_data[23:16];
+//         data[addr+1] <= wr_data[15:8];
+//         data[addr+0] <= wr_data[7:0];
+//     end
+// end
 
 // logic [7:0] counter_until_this;
 // logic counter_vld;
